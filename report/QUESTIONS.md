@@ -32,3 +32,20 @@ This document records architectural feedback, edge cases, and suggestions for fu
 ### B. Session Timestamp Metadata
 - **Issue**: The root `review.json` object contains `session_id` and `project_name` but lacks timestamps.
 - **Suggestion**: Add `created_at` and `completed_at` (ISO 8601 strings) to the root session structure to allow chronological session listing in server dashboards.
+
+---
+
+## 3. Architect Rulings (2026-07-16, post-handover)
+
+- **1A (board_region DPI)**: Accepted. `mcp/render.py` (Day 2) will render at a fixed
+  DPI and the review root will carry `render` metadata (`{image, width_px, height_px,
+  dpi}`). `board_region` stays in pixels of that render. Frontend scales overlays from
+  image natural size — no schema change to the finding object.
+- **1B (evidence artifacts array)**: Deferred to v2. Not needed for the hackathon demo.
+- **1C (agent display labels)**: Rejected as a schema change — six enum values; the
+  frontend keeps its own label map.
+- **2A (concessions)**: Confirmed as suggested — a concession still produces a standard
+  `ruling` block (decision + rationale + cited evidence), preserving history. Frontend
+  renders it like any ruling.
+- **2B (timestamps)**: Accepted — `created_at` / `signed_at` (ISO 8601) at the review
+  root; additive, display in the session header when present.

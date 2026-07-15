@@ -26,9 +26,10 @@ baseline on a seeded-defect benchmark (recall, false positives, tokens, wall tim
 - `benchmark/` — seeded-defect corpus of open-source KiCad boards + eval harness
   (society vs. single monolithic agent).
 - `report/` — interactive HTML findings report (blast-radius graph of findings →
-  nets → components). **Built in Antigravity — see ANTIGRAVITY_BRIEF.md. Do not
-  implement files under report/ from this repo's Claude sessions; treat the JSON
-  contract in docs/schemas/finding.schema.json as frozen.**
+  nets → components). Zero-dependency vanilla JS, works offline from `file://`.
+  Originally built externally against ANTIGRAVITY_BRIEF.md (now the de-facto
+  frontend spec); owned by the `frontend-engineer` agent since 2026-07-16. The
+  JSON contract in docs/schemas/finding.schema.json remains frozen.
 - `docs/` — architecture doc, negotiation protocol spec, schemas.
 
 ## Conventions

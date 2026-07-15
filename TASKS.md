@@ -1,8 +1,11 @@
 # BoardRoom Task Board
 
-Deadline: **Sun Jul 20, 23:00 GMT+2**. Today: Jul 15. Owners are `.claude/agents/*`;
-`[AG]` = Antigravity workstream; `[LLUIS]` = manual (see README of this file's bottom
-section). Mark done with commit hash.
+Deadline: **Sun Jul 20, 23:00 GMT+2**. Owners are `.claude/agents/*`; `[LLUIS]` =
+manual. Mark done with commit hash.
+
+> 2026-07-16: Day 1 fully done (commit d1840d1, 111/111 tests). The external
+> Antigravity workstream delivered report/ v1 and is discontinued — remaining
+> `[AG]` items are now owned by `frontend-engineer`.
 
 ## Day 1 — Wed Jul 16 · skeleton runs end-to-end (mocked)
 

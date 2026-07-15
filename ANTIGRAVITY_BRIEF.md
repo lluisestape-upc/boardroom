@@ -1,4 +1,10 @@
-# Antigravity Workstream Brief — `report/` (BoardRoom review frontend)
+# `report/` Frontend Spec (BoardRoom review viewer)
+
+> **Status 2026-07-16:** the external Antigravity workstream delivered the Day-1
+> version of report/ and is no longer active. This document is retained as the
+> frontend spec; the `frontend-engineer` agent (.claude/agents/) owns report/ now.
+> The input contract below is still frozen. Open questions from the original team
+> are in report/QUESTIONS.md with architect rulings noted there.
 
 You are building the **entire `report/` directory** of BoardRoom, a multi-agent PCB
 design review system for the Qwen Cloud hackathon (Track 3). You own this directory

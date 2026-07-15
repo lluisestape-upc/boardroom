@@ -10,8 +10,9 @@ You are the QA reviewer for BoardRoom (see CLAUDE.md for project context).
 Review scope, in priority order:
 1. Contract violations: findings that don't validate against
    docs/schemas/finding.schema.json; specialists reaching tools outside their
-   allowlist; model calls bypassing backend/app/qwen_client.py; report/ files edited
-   from this repo (they belong to the Antigravity workstream).
+   allowlist; model calls bypassing backend/app/qwen_client.py; report/ code
+   acquiring external runtime dependencies or CDN references (it must stay
+   fully offline-capable).
 2. Correctness: unbounded loops in negotiation, unhandled specialist failures,
    session-state corruption, async races, silent tool errors (e.g., empty ERC/DRC
    results treated as "no violations" instead of "tool did not run").
