@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/lluisestape/boardroom/docs/schemas/finding.schema.json",
+  "title": "BoardRoom Finding",
+  "description": "A single review finding filed by a specialist agent. FROZEN CONTRACT (v1): the orchestrator, benchmark, and the Antigravity-built report frontend all depend on this shape. Changes require architect sign-off and a version bump.",
+  "type": "object",
+  "required": ["id", "agent", "claim", "severity", "evidence", "recommendation", "status"],
+  "properties": {
+    "id": { "type": "string", "description": "Unique within a session, e.g. 'PI-003'" },
+    "agent": {
+      "type": "string",
+      "enum": ["power_integrity", "signal_integrity", "connectivity_erc", "dfm_layout", "firmware_bringup", "moderator"]
+    },
+    "claim": { "type": "string", "description": "One-sentence statement of the defect or risk" },
+    "severity": { "type": "string", "enum": ["critical", "major", "minor", "info"] },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Every finding must cite at least one cached tool output. Uncited findings are rejected at the boundary.",
+      "items": {
+        "type": "object",
+        "required": ["evidence_id", "tool", "summary"],
+        "properties": {
+          "evidence_id": { "type": "string", "description": "Id of the cached MCP tool-call result" },
+          "tool": { "type": "string", "description": "KiCad MCP tool name, e.g. 'run_erc'" },
+          "summary": { "type": "string", "description": "What in the output supports the claim" }
+        }
+      }
+    },
+    "affected_nets": { "type": "array", "items": { "type": "string" } },
+    "affected_components": { "type": "array", "items": { "type": "string" }, "description": "Reference designators, e.g. 'U3', 'C12'" },
+    "board_region": {
+      "type": ["object", "null"],
+      "description": "Optional bounding box on the rendered board image (px), used by the VL layout critic and the report frontend highlight overlay",
+      "properties": {
+        "x": { "type": "number" }, "y": { "type": "number" },
+        "w": { "type": "number" }, "h": { "type": "number" },
+        "image": { "type": "string", "description": "Render filename the box refers to" }
+      }
+    },
+    "recommendation": { "type": "string", "description": "Concrete change the finding proposes" },
+    "status": {
+      "type": "string",
+      "enum": ["open", "contested", "upheld", "overruled", "merged"],
+      "description": "Lifecycle: open → (contested → debate) → upheld | overruled | merged"
+    },
+    "debate": {
+      "type": "array",
+      "description": "Present when the finding entered negotiation. Max 2 rounds by protocol.",
+      "items": {
+        "type": "object",
+        "required": ["round", "agent", "position"],
+        "properties": {
+          "round": { "type": "integer", "minimum": 1, "maximum": 2 },
+          "agent": { "type": "string" },
+          "position": { "type": "string" },
+          "new_evidence_id": { "type": ["string", "null"], "description": "The one extra tool call this agent was allowed this round" }
+        }
+      }
+    },
+    "ruling": {
+      "type": ["object", "null"],
+      "description": "Moderator's decision for contested findings",
+      "required": ["decision", "rationale", "cited_evidence_ids"],
+      "properties": {
+        "decision": { "type": "string", "enum": ["upheld", "overruled", "merged"] },
+        "rationale": { "type": "string" },
+        "cited_evidence_ids": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+      }
+    },
+    "conflicts_with": { "type": "array", "items": { "type": "string" }, "description": "Ids of findings this one conflicts with" }
+  }
+}

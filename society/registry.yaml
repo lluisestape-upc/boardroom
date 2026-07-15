@@ -1,0 +1,83 @@
+# BoardRoom agent registry — SINGLE SOURCE OF TRUTH for the society.
+#
+# For each agent: which Qwen model it runs on, where its system prompt lives
+# (path relative to the repo root), and which KiCad MCP tools it may call.
+# The tool allowlist here is DATA — enforcement happens in mcp/allowlist.py
+# (mcp-engineer's workstream), which reads this file.
+#
+# !! MODEL IDS MUST BE VERIFIED in the Alibaba Cloud Model Studio console before
+# !! any live run. The ids below (qwen3-max / qwen-flash / qwen3-vl-plus /
+# !! qwen3-coder-plus) are the expected ids as of Jul 2026; if the console shows
+# !! different current ids, change them HERE and nowhere else.
+
+version: 1
+
+agents:
+  moderator:
+    model: qwen3-max
+    prompt: society/prompts/moderator.md
+    # The Moderator orchestrates and adjudicates; it only gets cheap overview
+    # tools for building the session manifest, never specialist analysis tools.
+    tools:
+      - get_schematic_info
+      - get_pcb_statistics
+      - generate_netlist
+
+  power_integrity:
+    model: qwen-flash
+    prompt: society/prompts/power_integrity.md
+    tools:
+      - extract_power_domains
+      - analyze_pcb_power_integrity
+      - list_schematic_nets
+      - get_netlist_nets
+      - trace_netlist_connection
+      - find_tracks_by_net
+      - get_symbol_details
+
+  signal_integrity:
+    model: qwen-flash
+    prompt: society/prompts/signal_integrity.md
+    tools:
+      - analyze_pcb_signal_integrity
+      - analyze_pcb_nets
+      - find_tracks_by_net
+      - list_schematic_nets
+      - get_netlist_nets
+      - trace_netlist_connection
+
+  connectivity_erc:
+    model: qwen-flash
+    prompt: society/prompts/connectivity_erc.md
+    tools:
+      - run_erc
+      - get_erc_violations
+      - detect_pin_conflicts
+      - analyze_pin_functions
+      - validate_pin_configuration
+      - list_schematic_components
+      - list_schematic_nets
+      - trace_netlist_connection
+      - get_symbol_details
+
+  dfm_layout:
+    model: qwen3-vl-plus
+    prompt: society/prompts/dfm_layout.md
+    tools:
+      - run_drc
+      - get_drc_violations
+      - list_pcb_footprints
+      - get_pcb_statistics
+      - render_board # mcp/render.py: kicad-cli board -> PNG for the VL critique
+
+  firmware_bringup:
+    model: qwen3-coder-plus
+    prompt: society/prompts/firmware_bringup.md
+    tools:
+      - extract_gpio_config
+      - extract_i2c_devices
+      - extract_spi_devices
+      - extract_pinmux_config
+      - generate_device_tree
+      - get_netlist_components
+      - list_schematic_components

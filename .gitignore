@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+sessions/
+*.egg-info/
+.pytest_cache/
+node_modules/
+report/node_modules/
+benchmark/corpus/downloads/
+*.kicad_prl
+fp-info-cache
+.DS_Store
