@@ -191,6 +191,50 @@ class NetlistComponentsArgs(_Args):
     filter_ref: str = ""
 
 
+class SignalIntegrityArgs(_Args):
+    file_path: str
+    net_name: str = ""
+
+
+class TracksByNetArgs(_Args):
+    file_path: str
+    net_name: str
+
+
+class TraceConnectionArgs(_Args):
+    netlist_path: str
+    reference: str
+    pin_number: str = ""
+
+
+class PinFunctionsArgs(_Args):
+    schematic_path: str
+    reference: str = ""
+
+
+class GpioConfigArgs(_Args):
+    schematic_path: str
+    soc_family: str = ""
+
+
+class DeviceTreeArgs(_Args):
+    schematic_path: str
+    target_soc: str = "stm32f4"
+    output_path: str = ""
+
+
+class PcbFootprintsArgs(_Args):
+    file_path: str
+    filter_layer: str | None = None
+
+
+class SchematicComponentsArgs(_Args):
+    file_path: str
+    filter_type: str | None = None
+    filter_value: str | None = None
+    filter_dnp: bool | None = None
+
+
 class NetlistNetsArgs(_Args):
     netlist_path: str
     filter_pattern: str = ""
@@ -939,4 +983,1175 @@ def parse_get_pcb_statistics(raw: str) -> PcbStatistics:
         nets=_int(kv.get("Nets")),
         smallest_clearance_mm=_float(kv.get("Smallest Clearance")),
         default_track_width_mm=_float(kv.get("Default Track Width")),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Day-2 result models (formats verified against the kicad-mcp-server source:
+# tools/pcb.py, tools/netlist.py, tools/pin_analysis.py, tools/device_tree.py,
+# tools/schematic.py)
+# ---------------------------------------------------------------------------
+
+
+def _row_get(table: _Table, row: list[str], *names: str) -> str:
+    """First existing cell among column ``names`` (header aliases)."""
+    for name in names:
+        i = table.col(name)
+        if i is not None and i < len(row):
+            return row[i]
+    return ""
+
+
+def _pin_name_number(cell: str) -> tuple[str, str]:
+    """'GPIO4 (24)' -> ('GPIO4', '24'); plain cells come back with '' number."""
+    m = re.match(r"^(.*?)\s*\(([^()]+)\)\s*$", cell.strip())
+    if m:
+        return m.group(1).strip(), m.group(2).strip()
+    return cell.strip(), ""
+
+
+_DEGRADED_MARKER = "pcbnew not available"
+
+
+class DiffPairStats(BaseModel):
+    pair: str
+    net_p: str
+    net_n: str
+    length_p_mm: float | None = None
+    length_n_mm: float | None = None
+    delta_mm: float | None = None
+    status: str = ""  # 'OK' | 'Marginal' | 'Mismatch'
+
+
+class RfTraceStats(BaseModel):
+    net: str
+    length_mm: float | None = None
+    widths: str = ""
+    segments: int | None = None
+
+
+class SignalNetStats(BaseModel):
+    net: str
+    length_mm: float | None = None
+    segments: int | None = None
+    layers: str = ""
+
+
+class NetDetail(BaseModel):
+    net: str
+    segments: int | None = None
+    total_length_mm: float | None = None
+
+
+class SignalIntegrityReport(ToolReport):
+    path: str | None = None
+    degraded: bool = False
+    diff_pair_rule_width_mm: float | None = None
+    diff_pair_rule_gap_mm: float | None = None
+    diff_pairs: list[DiffPairStats] = []
+    rf_traces: list[RfTraceStats] = []
+    longest_signal_nets: list[SignalNetStats] = []
+    top_via_nets: dict[str, int] = {}
+    net_detail: NetDetail | None = None
+    note: str | None = None
+
+    def summary(self) -> str:
+        if self.note:
+            return f"Signal integrity on {self.path or 'board'}: {self.note}"
+        if self.net_detail is not None:
+            return (
+                f"Signal integrity detail for net {self.net_detail.net}: "
+                f"{self.net_detail.segments or 0} segments, "
+                f"{self.net_detail.total_length_mm or 0} mm total"
+            )
+        mismatched = sum(1 for p in self.diff_pairs if p.status != "OK")
+        deg = " [degraded: no pcbnew]" if self.degraded else ""
+        return (
+            f"Signal integrity on {self.path or 'board'}: "
+            f"{len(self.diff_pairs)} diff pairs ({mismatched} mismatched), "
+            f"{len(self.rf_traces)} RF traces, "
+            f"{len(self.longest_signal_nets)} signal nets ranked{deg}"
+        )
+
+
+class TrackSegment(BaseModel):
+    start_x_mm: float | None = None
+    start_y_mm: float | None = None
+    end_x_mm: float | None = None
+    end_y_mm: float | None = None
+    width_mm: float | None = None
+    layer: str = ""
+    length_mm: float | None = None
+
+
+class TrackVia(BaseModel):
+    x_mm: float | None = None
+    y_mm: float | None = None
+    size_mm: float | None = None
+    drill_mm: float | None = None
+    span: str = ""
+
+
+class TrackZone(BaseModel):
+    net: str
+    layer: str = ""
+    filled: bool | None = None
+
+
+class NetTrackAnalysis(ToolReport):
+    net: str
+    found: bool = True
+    degraded: bool = False
+    segment_count: int = 0
+    via_count: int = 0
+    zone_count: int = 0
+    total_length_mm: float | None = None
+    layers: list[str] = []
+    widths_mm: list[float] = []
+    mixed_widths: bool = False
+    segments: list[TrackSegment] = []
+    vias: list[TrackVia] = []
+    zones: list[TrackZone] = []
+    suggestions: list[str] = []
+    truncated: bool = False
+
+    def summary(self) -> str:
+        if not self.found:
+            hint = f" (similar nets: {', '.join(self.suggestions[:5])})" if self.suggestions else ""
+            return f"No tracks routed for net {self.net!r}{hint}"
+        mixed = ", mixed widths" if self.mixed_widths else ""
+        return (
+            f"Net {self.net}: {self.segment_count} segments, "
+            f"{self.total_length_mm or 0} mm on {', '.join(self.layers) or '?'}"
+            f", {self.via_count} vias, {self.zone_count} zones{mixed}"
+        )
+
+
+class TracedNet(BaseModel):
+    net: str
+    pin: str | None = None
+    connected_to: list[NetPinRef] = []
+
+
+class ConnectionTrace(ToolReport):
+    reference: str | None = None
+    nets: list[TracedNet] = []
+
+    def summary(self) -> str:
+        counterparts = sum(len(n.connected_to) for n in self.nets)
+        return (
+            f"Trace {self.reference or '?'}: {len(self.nets)} nets, "
+            f"{counterparts} counterpart pins"
+        )
+
+
+class PinConflict(BaseModel):
+    severity: str  # 'error' | 'warning' | 'info'
+    type: str
+    location: str = ""
+    description: str = ""
+
+
+class PinConflictReport(ToolReport):
+    schematic_path: str | None = None
+    passed: bool
+    total_conflicts: int = 0
+    conflicts: list[PinConflict] = []
+    truncated: bool = False
+
+    @property
+    def error_count(self) -> int:
+        return sum(1 for c in self.conflicts if c.severity == "error")
+
+    def summary(self) -> str:
+        if self.passed:
+            return f"No pin conflicts in {self.schematic_path or 'schematic'}"
+        more = " (list truncated)" if self.truncated else ""
+        return (
+            f"{self.total_conflicts} pin conflicts in "
+            f"{self.schematic_path or 'schematic'} ({self.error_count} errors){more}"
+        )
+
+
+class PinValidationReport(ToolReport):
+    schematic_path: str | None = None
+    passed: bool
+    mcu_found: bool = True
+    blocked_by_conflicts: bool = False
+    conflicts: list[PinConflict] = []
+    note: str | None = None
+
+    def summary(self) -> str:
+        if self.passed:
+            return f"Pin configuration valid for device tree generation ({self.schematic_path})"
+        if self.blocked_by_conflicts:
+            return (
+                f"Pin configuration invalid: {len(self.conflicts)} conflicts block "
+                f"device tree generation ({self.schematic_path})"
+            )
+        return f"Pin configuration validation: {self.note or 'failed'} ({self.schematic_path})"
+
+
+class PinFunctionEntry(BaseModel):
+    component: str
+    pin_name: str = ""
+    pin_number: str = ""
+    pin_type: str = ""
+    nets: list[str] = []
+    functions: list[str] = []
+    mcu_family: str | None = None
+
+
+class PinFunctionAnalysis(ToolReport):
+    schematic_path: str | None = None
+    component: str | None = None
+    total_pins: int = 0
+    pins: list[PinFunctionEntry] = []
+    truncated: bool = False
+    note: str | None = None
+
+    def summary(self) -> str:
+        if self.note:
+            return f"Pin function analysis on {self.schematic_path or 'schematic'}: {self.note}"
+        scope = f" for {self.component}" if self.component else ""
+        return (
+            f"Pin function analysis{scope}: {self.total_pins} pins analyzed, "
+            f"{sum(1 for p in self.pins if p.functions)} with inferred functions"
+        )
+
+
+class I2cDevice(BaseModel):
+    component: str
+    value: str = ""
+    compatible: str = ""
+    address: str | None = None  # '0x76' or None when unknown
+    net: str = ""
+
+
+class I2cDevices(ToolReport):
+    schematic_path: str | None = None
+    total: int = 0
+    devices: list[I2cDevice] = []
+    note: str | None = None
+
+    def summary(self) -> str:
+        if not self.devices:
+            return "No I2C devices found in schematic"
+        named = ", ".join(f"{d.component}@{d.address or '?'}" for d in self.devices[:8])
+        return f"{self.total} I2C devices: {named}"
+
+
+class SpiDevice(BaseModel):
+    component: str
+    value: str = ""
+    compatible: str = ""
+    net: str = ""
+
+
+class SpiDevices(ToolReport):
+    schematic_path: str | None = None
+    total: int = 0
+    devices: list[SpiDevice] = []
+    note: str | None = None
+
+    def summary(self) -> str:
+        if not self.devices:
+            return "No SPI devices found in schematic"
+        named = ", ".join(d.component for d in self.devices[:8])
+        return f"{self.total} SPI devices: {named}"
+
+
+class GpioPin(BaseModel):
+    component: str
+    pin_name: str = ""
+    pin_number: str = ""
+    net: str = ""
+    soc: str = ""
+
+
+class GpioConfig(ToolReport):
+    schematic_path: str | None = None
+    soc_family: str | None = None
+    total: int = 0
+    pins: list[GpioPin] = []
+    note: str | None = None
+
+    def summary(self) -> str:
+        if not self.pins:
+            return "No GPIO configurations found in schematic"
+        return f"{self.total} GPIO pins extracted ({len({p.component for p in self.pins})} MCUs)"
+
+
+class DeviceTreeResult(ToolReport):
+    schematic_path: str | None = None
+    target_soc: str | None = None
+    output_path: str | None = None
+    gpio_pins: int = 0
+    i2c_buses: int = 0
+    spi_buses: int = 0
+    uarts: int = 0
+    dts: str | None = None
+
+    def summary(self) -> str:
+        return (
+            f"Device tree generated for {self.target_soc or '?'}: "
+            f"{self.gpio_pins} GPIOs, {self.i2c_buses} I2C buses, "
+            f"{self.spi_buses} SPI buses, {self.uarts} UARTs"
+        )
+
+
+class FootprintEntry(BaseModel):
+    reference: str
+    value: str = ""
+    library: str = ""
+    layer: str = ""
+    x_mm: float | None = None
+    y_mm: float | None = None
+    rotation_deg: float | None = None
+    pads: int | None = None
+
+
+class PcbFootprints(ToolReport):
+    path: str | None = None
+    total: int = 0
+    footprints: list[FootprintEntry] = []
+    note: str | None = None
+
+    def summary(self) -> str:
+        if not self.footprints:
+            return f"No footprints found ({self.note or 'empty board or filtered out'})"
+        layers = sorted({f.layer for f in self.footprints if f.layer})
+        return (
+            f"{self.total} footprints on {self.path or 'board'} "
+            f"(layers: {', '.join(layers) or '?'})"
+        )
+
+
+class NetRouteStats(BaseModel):
+    net: str
+    length_mm: float | None = None
+    segments: int | None = None
+    widths: str = ""
+    layers: str = ""
+
+
+class PcbRoutingReport(ToolReport):
+    path: str | None = None
+    degraded: bool = False
+    board_width_mm: float | None = None
+    board_height_mm: float | None = None
+    copper_layers: int | None = None
+    track_segments: int | None = None
+    net_count: int | None = None
+    via_count: int | None = None
+    zone_count: int | None = None
+    track_width_distribution: dict[str, int] = {}
+    via_drill_distribution: dict[str, int] = {}
+    via_layer_spans: dict[str, int] = {}
+    segments_by_layer: dict[str, int] = {}
+    top_nets: list[NetRouteStats] = []
+    min_track_width_mm: float | None = None
+    default_track_width_mm: float | None = None
+    smallest_clearance_mm: float | None = None
+    warnings: list[str] = []
+
+    def summary(self) -> str:
+        deg = " [degraded: no pcbnew]" if self.degraded else ""
+        return (
+            f"Routing analysis on {self.path or 'board'}: "
+            f"{self.track_segments or 0} segments"
+            + (f" across {self.net_count} nets" if self.net_count else "")
+            + f", {self.via_count or 0} vias, "
+            f"{len(self.track_width_distribution)} track widths, "
+            f"{len(self.warnings)} warnings{deg}"
+        )
+
+
+class SchematicComponentEntry(BaseModel):
+    reference: str
+    value: str = ""
+    footprint: str | None = None
+    library: str = ""
+    dnp: bool = False
+    in_bom: bool = True
+
+
+class SchematicComponents(ToolReport):
+    path: str | None = None
+    total: int = 0
+    components: list[SchematicComponentEntry] = []
+    note: str | None = None
+
+    def summary(self) -> str:
+        if not self.components:
+            return f"No schematic components matched ({self.note or 'no filter hits'})"
+        dnp = sum(1 for c in self.components if c.dnp)
+        extra = f", {dnp} DNP" if dnp else ""
+        return f"{self.total} schematic components listed{extra}"
+
+
+# ---------------------------------------------------------------------------
+# Signal tools
+# ---------------------------------------------------------------------------
+
+
+def _diff_pairs_from_table(table: _Table | None) -> list[DiffPairStats]:
+    pairs: list[DiffPairStats] = []
+    if table is None:
+        return pairs
+    for row in table.rows:
+        pair = _row_get(table, row, "Pair")
+        if not pair:
+            continue
+        pairs.append(
+            DiffPairStats(
+                pair=pair,
+                net_p=_row_get(table, row, "Net P"),
+                net_n=_row_get(table, row, "Net N"),
+                length_p_mm=_float(_row_get(table, row, "Length P")),
+                length_n_mm=_float(_row_get(table, row, "Length N")),
+                delta_mm=_float(_row_get(table, row, "Delta")),
+                status=_strip_icon(_row_get(table, row, "Status")),
+            )
+        )
+    return pairs
+
+
+_NO_TRACKS_FOR_NET_RE = re.compile(r"^No tracks(?: or vias)? found for net '(.+)'\.$")
+
+
+@adapter(
+    "analyze_pcb_signal_integrity",
+    SignalIntegrityArgs,
+    "Diff pair matching, RF traces, longest signal nets",
+)
+def parse_analyze_pcb_signal_integrity(raw: str) -> SignalIntegrityReport:
+    first = _first_line(raw)
+    if first.startswith(("Error", "❌", "X ")):
+        _raise_if_missing_artifact(raw)
+        raise ToolExecutionError(first, detail=raw)
+    if first == "No tracks found in PCB file.":
+        return SignalIntegrityReport(note="no tracks in PCB (board unrouted)")
+    no_net = _NO_TRACKS_FOR_NET_RE.match(first)
+    if no_net:
+        return SignalIntegrityReport(note=f"no tracks found for net '{no_net.group(1)}'")
+    if "Signal Integrity Analysis" not in raw:
+        raise AdapterParseError(
+            f"unrecognized analyze_pcb_signal_integrity output: {first[:120]}", detail=raw
+        )
+
+    path_match = re.search(r"# Signal Integrity Analysis:\s*(.+)$", raw, re.M)
+    rules_match = re.search(
+        r"\*\*Diff Pair Design Rules:\*\*\s*width=([\d.]+)\s*mm,\s*gap=([\d.]+)\s*mm", raw
+    )
+
+    net_detail: NetDetail | None = None
+    detail_match = re.search(
+        r"^##\s*Net:\s*(.+)\n\*\*Segments:\*\*\s*(\d+),\s*\*\*Total Length:\*\*\s*([\d.]+)\s*mm",
+        raw,
+        re.M,
+    )
+    if detail_match:
+        net_detail = NetDetail(
+            net=detail_match.group(1).strip(),
+            segments=int(detail_match.group(2)),
+            total_length_mm=float(detail_match.group(3)),
+        )
+
+    rf_traces: list[RfTraceStats] = []
+    rf_table = _table_in_section(raw, "RF Traces")
+    if rf_table is not None:
+        for row in rf_table.rows:
+            net = _row_get(rf_table, row, "Net")
+            if net:
+                rf_traces.append(
+                    RfTraceStats(
+                        net=net,
+                        length_mm=_float(_row_get(rf_table, row, "Length")),
+                        widths=_row_get(rf_table, row, "Widths"),
+                        segments=_int(_row_get(rf_table, row, "Segments")),
+                    )
+                )
+
+    longest: list[SignalNetStats] = []
+    signals_table = _table_in_section(raw, "Longest Signal Nets")
+    if signals_table is not None:
+        for row in signals_table.rows:
+            net = _row_get(signals_table, row, "Net")
+            if net:
+                longest.append(
+                    SignalNetStats(
+                        net=net,
+                        length_mm=_float(_row_get(signals_table, row, "Length (mm)", "Length")),
+                        segments=_int(_row_get(signals_table, row, "Segments")),
+                        layers=_row_get(signals_table, row, "Layers"),
+                    )
+                )
+
+    top_via_nets: dict[str, int] = {}
+    via_table = _table_in_section(raw, "Nets with Most Vias")
+    if via_table is not None:
+        for row in via_table.rows:
+            net = _row_get(via_table, row, "Net")
+            count = _int(_row_get(via_table, row, "Via Count"))
+            if net and count is not None:
+                top_via_nets[net] = count
+
+    return SignalIntegrityReport(
+        path=path_match.group(1).strip() if path_match else None,
+        degraded=_DEGRADED_MARKER in raw,
+        diff_pair_rule_width_mm=float(rules_match.group(1)) if rules_match else None,
+        diff_pair_rule_gap_mm=float(rules_match.group(2)) if rules_match else None,
+        diff_pairs=_diff_pairs_from_table(_table_in_section(raw, "Differential Pair Analysis")),
+        rf_traces=rf_traces,
+        longest_signal_nets=longest,
+        top_via_nets=top_via_nets,
+        net_detail=net_detail,
+    )
+
+
+@adapter("find_tracks_by_net", TracksByNetArgs, "Track segments, vias, zones for one net")
+def parse_find_tracks_by_net(raw: str) -> NetTrackAnalysis:
+    first = _first_line(raw)
+    if first.startswith(("Error", "❌", "X ")):
+        _raise_if_missing_artifact(raw)
+        raise ToolExecutionError(first, detail=raw)
+
+    no_net = _NO_TRACKS_FOR_NET_RE.match(first)
+    if no_net:
+        return NetTrackAnalysis(net=no_net.group(1), found=False)
+
+    # "Did you mean" variant: exact match failed but similar nets exist.
+    sugg_match = re.match(r"^# Tracks for '(.+)'$", first)
+    if sugg_match and "Exact match not found" in raw:
+        suggestions = re.findall(r"^-\s*`([^`]+)`", raw, re.M)
+        return NetTrackAnalysis(net=sugg_match.group(1), found=False, suggestions=suggestions)
+
+    head_match = re.match(r"^# Track Analysis:\s*(.+)$", first)
+    if not head_match:
+        raise AdapterParseError(
+            f"unrecognized find_tracks_by_net output: {first[:120]}", detail=raw
+        )
+
+    kv = _kv(raw)
+    layers_raw = kv.get("Layers Used", "")
+    layers = [] if layers_raw in ("", "N/A") else [s.strip() for s in layers_raw.split(",")]
+    widths_mm = [float(w) for w in _FLOAT_RE.findall(kv.get("Track Widths", ""))]
+
+    segments: list[TrackSegment] = []
+    seg_table = _table_in_section(raw, "Track Segments")
+    if seg_table is not None:
+        for row in seg_table.rows:
+            if _row_get(seg_table, row, "#").startswith("..."):
+                continue
+            start = _FLOAT_RE.findall(_row_get(seg_table, row, "Start"))
+            end = _FLOAT_RE.findall(_row_get(seg_table, row, "End"))
+            segments.append(
+                TrackSegment(
+                    start_x_mm=float(start[0]) if len(start) >= 2 else None,
+                    start_y_mm=float(start[1]) if len(start) >= 2 else None,
+                    end_x_mm=float(end[0]) if len(end) >= 2 else None,
+                    end_y_mm=float(end[1]) if len(end) >= 2 else None,
+                    width_mm=_float(_row_get(seg_table, row, "Width")),
+                    layer=_row_get(seg_table, row, "Layer"),
+                    length_mm=_float(_row_get(seg_table, row, "Length")),
+                )
+            )
+
+    vias: list[TrackVia] = []
+    via_table = _table_in_section(raw, "Vias")
+    if via_table is not None:
+        for row in via_table.rows:
+            if _row_get(via_table, row, "#").startswith("..."):
+                continue
+            pos = _FLOAT_RE.findall(_row_get(via_table, row, "Position"))
+            vias.append(
+                TrackVia(
+                    x_mm=float(pos[0]) if len(pos) >= 2 else None,
+                    y_mm=float(pos[1]) if len(pos) >= 2 else None,
+                    size_mm=_float(_row_get(via_table, row, "Size")),
+                    drill_mm=_float(_row_get(via_table, row, "Drill")),
+                    span=_row_get(via_table, row, "Span", "Layers"),
+                )
+            )
+
+    zones: list[TrackZone] = []
+    zone_table = _table_in_section(raw, "Copper Zones")
+    if zone_table is not None:
+        for row in zone_table.rows:
+            net = _row_get(zone_table, row, "Net")
+            if not net:
+                continue
+            filled_cell = _row_get(zone_table, row, "Filled")
+            zones.append(
+                TrackZone(
+                    net=net,
+                    layer=_row_get(zone_table, row, "Layer"),
+                    filled=None if not filled_cell else filled_cell.lower() == "yes",
+                )
+            )
+
+    return NetTrackAnalysis(
+        net=head_match.group(1).strip(),
+        degraded=_DEGRADED_MARKER in raw,
+        segment_count=_int(kv.get("Track Segments")) or 0,
+        via_count=_int(kv.get("Vias")) or 0,
+        zone_count=_int(kv.get("Copper Zones")) or 0,
+        total_length_mm=_float(kv.get("Total Track Length")),
+        layers=layers,
+        widths_mm=widths_mm,
+        mixed_widths="Mixed track widths detected" in raw,
+        segments=segments,
+        vias=vias,
+        zones=zones,
+        truncated="more segments" in raw or "more vias" in raw,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Netlist connection tracing
+# ---------------------------------------------------------------------------
+
+
+def _ref_pin_table(body: str) -> list[NetPinRef]:
+    pins: list[NetPinRef] = []
+    for table in _tables(body):
+        if table.col("Reference") is not None and table.col("Pin") is not None:
+            for row in table.rows:
+                ref = _row_get(table, row, "Reference")
+                if ref and not ref.startswith("..."):
+                    pins.append(NetPinRef(reference=ref, pin=_row_get(table, row, "Pin")))
+    return pins
+
+
+@adapter("trace_netlist_connection", TraceConnectionArgs, "Pin-accurate connection trace via netlist")
+def parse_trace_netlist_connection(raw: str) -> ConnectionTrace:
+    first = _first_line(raw)
+    if first.startswith("❌"):
+        _raise_if_missing_artifact(raw)
+        raise ToolExecutionError(first, detail=raw)
+
+    ref_match = re.search(r"^##\s*Netlist Connection Trace:\s*(.+)$", raw, re.M)
+    if not ref_match:
+        raise AdapterParseError(
+            f"unrecognized trace_netlist_connection output: {first[:120]}", detail=raw
+        )
+    reference = ref_match.group(1).strip()
+
+    nets: list[TracedNet] = []
+    if "**Total Nets:**" in raw:
+        # All-pins variant: one "### Net: NAME" section per connected net.
+        for heading, body in _split_h3_sections(raw):
+            if not heading.startswith("Net:"):
+                continue
+            nets.append(
+                TracedNet(
+                    net=heading.removeprefix("Net:").strip(),
+                    pin=_kv(body).get("Pin"),
+                    connected_to=_ref_pin_table(body),
+                )
+            )
+    else:
+        # Single-pin variant: **Pin:** / **Net:** header + one connections table.
+        kv = _kv(raw)
+        net_name = kv.get("Net")
+        if net_name is None:
+            raise AdapterParseError(
+                f"trace_netlist_connection output has no **Net:** field: {first[:120]}",
+                detail=raw,
+            )
+        nets.append(
+            TracedNet(net=net_name, pin=kv.get("Pin"), connected_to=_ref_pin_table(raw))
+        )
+
+    return ConnectionTrace(reference=reference, nets=nets)
+
+
+# ---------------------------------------------------------------------------
+# Pin tools
+# ---------------------------------------------------------------------------
+
+
+def _conflicts_from_table(raw: str) -> tuple[list[PinConflict], bool]:
+    conflicts: list[PinConflict] = []
+    table = next((t for t in _tables(raw) if t.col("Severity") is not None), None)
+    if table is not None:
+        for row in table.rows:
+            sev = _strip_icon(_row_get(table, row, "Severity"))
+            if not sev:
+                continue
+            conflicts.append(
+                PinConflict(
+                    severity=sev,
+                    type=_row_get(table, row, "Type"),
+                    location=_row_get(table, row, "Location"),
+                    description=_row_get(table, row, "Description"),
+                )
+            )
+    truncated = "more conflicts" in raw
+    return conflicts, truncated
+
+
+@adapter("detect_pin_conflicts", SchematicPathArgs, "Electrical pin conflicts from netlist")
+def parse_detect_pin_conflicts(raw: str) -> PinConflictReport:
+    first = _first_line(raw)
+    kv = _kv(raw)
+    if "No Pin Conflicts Detected" in first:
+        return PinConflictReport(schematic_path=kv.get("Schematic"), passed=True)
+    if "Pin Conflicts Detected" in first:
+        conflicts, truncated = _conflicts_from_table(raw)
+        total = _int(kv.get("Total Conflicts"))
+        return PinConflictReport(
+            schematic_path=kv.get("Schematic"),
+            passed=False,
+            total_conflicts=total if total is not None else len(conflicts),
+            conflicts=conflicts,
+            truncated=truncated,
+        )
+    if first.startswith("❌"):
+        _raise_if_missing_artifact(raw)
+        raise ToolExecutionError(first, detail=raw)
+    raise AdapterParseError(
+        f"unrecognized detect_pin_conflicts output: {first[:120]}", detail=raw
+    )
+
+
+@adapter(
+    "validate_pin_configuration",
+    SchematicPathArgs,
+    "Pin configuration readiness for device tree generation",
+)
+def parse_validate_pin_configuration(raw: str) -> PinValidationReport:
+    first = _first_line(raw)
+    kv = _kv(raw)
+    # This tool uses plain "OK"/"WARN"/"X" prefixes instead of emoji.
+    if "Pin Configuration Validation Passed" in first:
+        return PinValidationReport(schematic_path=kv.get("Schematic"), passed=True)
+    if "No MCU Component Found" in first:
+        return PinValidationReport(
+            schematic_path=kv.get("Schematic"),
+            passed=False,
+            mcu_found=False,
+            note="no MCU component found (device tree generation not applicable)",
+        )
+    if "Pin Configuration Validation Failed" in first:
+        conflicts, _ = _conflicts_from_table(raw)
+        return PinValidationReport(
+            schematic_path=kv.get("Schematic"),
+            passed=False,
+            blocked_by_conflicts=True,
+            conflicts=conflicts,
+            note="pin conflicts block device tree generation",
+        )
+    if first.startswith(("X ", "❌")):
+        _raise_if_missing_artifact(raw)
+        raise ToolExecutionError(first, detail=raw)
+    raise AdapterParseError(
+        f"unrecognized validate_pin_configuration output: {first[:120]}", detail=raw
+    )
+
+
+@adapter("analyze_pin_functions", PinFunctionsArgs, "Inferred pin functions from net names")
+def parse_analyze_pin_functions(raw: str) -> PinFunctionAnalysis:
+    first = _first_line(raw)
+    if first.startswith("❌"):
+        if "Component not found" in first:
+            raise ToolExecutionError(first, detail=raw)
+        _raise_if_missing_artifact(raw)
+        raise ToolExecutionError(first, detail=raw)
+    kv = _kv(raw)
+    if "No Pin Analysis Available" in first:
+        return PinFunctionAnalysis(
+            schematic_path=kv.get("Schematic"),
+            component=kv.get("Component"),
+            total_pins=0,
+            note="no pin information could be extracted",
+        )
+    if "Pin Function Analysis" not in raw:
+        raise AdapterParseError(
+            f"unrecognized analyze_pin_functions output: {first[:120]}", detail=raw
+        )
+
+    pins: list[PinFunctionEntry] = []
+    table = _table_in_section(raw, "Pin Details")
+    if table is not None:
+        for row in table.rows:
+            component = _row_get(table, row, "Component")
+            if not component:
+                continue
+            name, number = _pin_name_number(_row_get(table, row, "Pin"))
+            nets_cell = re.sub(r"\(\+\d+ more\)", "", _row_get(table, row, "Nets")).strip()
+            nets = (
+                []
+                if nets_cell in ("", "N/A")
+                else [n.strip() for n in nets_cell.split(",") if n.strip()]
+            )
+            functions_cell = _row_get(table, row, "Inferred Functions")
+            functions = (
+                []
+                if functions_cell in ("", "Unknown")
+                else [f.strip() for f in functions_cell.split(",") if f.strip()]
+            )
+            family = _row_get(table, row, "MCU Family")
+            pins.append(
+                PinFunctionEntry(
+                    component=component,
+                    pin_name=name,
+                    pin_number=number,
+                    pin_type=_row_get(table, row, "Type"),
+                    nets=nets,
+                    functions=functions,
+                    mcu_family=None if family in ("", "N/A") else family,
+                )
+            )
+
+    total = _int(kv.get("Total Pins Analyzed"))
+    return PinFunctionAnalysis(
+        schematic_path=kv.get("Schematic"),
+        component=kv.get("Component"),
+        total_pins=total if total is not None else len(pins),
+        pins=pins,
+        truncated="more pins" in raw,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Firmware tools
+# ---------------------------------------------------------------------------
+
+
+def _dts_block(raw: str) -> str | None:
+    m = re.search(r"```dts\n(.*?)```", raw, re.S)
+    return m.group(1).rstrip() if m else None
+
+
+@adapter("extract_i2c_devices", SchematicPathArgs, "I2C devices with inferred addresses")
+def parse_extract_i2c_devices(raw: str) -> I2cDevices:
+    first = _first_line(raw)
+    # This tool uses plain "X"/"WARN" prefixes instead of emoji.
+    if first.startswith(("X ", "❌")):
+        _raise_if_missing_artifact(raw)
+        raise ToolExecutionError(first, detail=raw)
+    kv = _kv(raw)
+    if "No I2C Devices Found" in first:
+        return I2cDevices(
+            schematic_path=kv.get("Schematic"), total=0, note="no I2C devices found"
+        )
+    if "I2C Device Extraction" not in raw:
+        raise AdapterParseError(
+            f"unrecognized extract_i2c_devices output: {first[:120]}", detail=raw
+        )
+    devices: list[I2cDevice] = []
+    table = _table_in_section(raw, "I2C Device Details")
+    if table is not None:
+        for row in table.rows:
+            component = _row_get(table, row, "Component")
+            if not component:
+                continue
+            address = _row_get(table, row, "Address")
+            devices.append(
+                I2cDevice(
+                    component=component,
+                    value=_row_get(table, row, "Device"),
+                    compatible=_row_get(table, row, "Compatible"),
+                    address=None if address in ("", "Unknown") else address,
+                    net=_row_get(table, row, "Net"),
+                )
+            )
+    total = _int(kv.get("Total I2C Devices"))
+    return I2cDevices(
+        schematic_path=kv.get("Schematic"),
+        total=total if total is not None else len(devices),
+        devices=devices,
+    )
+
+
+@adapter("extract_spi_devices", SchematicPathArgs, "SPI devices from schematic nets")
+def parse_extract_spi_devices(raw: str) -> SpiDevices:
+    first = _first_line(raw)
+    if first.startswith(("X ", "❌")):
+        _raise_if_missing_artifact(raw)
+        raise ToolExecutionError(first, detail=raw)
+    kv = _kv(raw)
+    if "No SPI Devices Found" in first:
+        return SpiDevices(
+            schematic_path=kv.get("Schematic"), total=0, note="no SPI devices found"
+        )
+    if "SPI Device Extraction" not in raw:
+        raise AdapterParseError(
+            f"unrecognized extract_spi_devices output: {first[:120]}", detail=raw
+        )
+    devices: list[SpiDevice] = []
+    table = _table_in_section(raw, "SPI Device Details")
+    if table is not None:
+        for row in table.rows:
+            component = _row_get(table, row, "Component")
+            if not component:
+                continue
+            devices.append(
+                SpiDevice(
+                    component=component,
+                    value=_row_get(table, row, "Device"),
+                    compatible=_row_get(table, row, "Compatible"),
+                    net=_row_get(table, row, "Net"),
+                )
+            )
+    total = _int(kv.get("Total SPI Devices"))
+    return SpiDevices(
+        schematic_path=kv.get("Schematic"),
+        total=total if total is not None else len(devices),
+        devices=devices,
+    )
+
+
+@adapter("extract_gpio_config", GpioConfigArgs, "GPIO pin configuration from MCU nets")
+def parse_extract_gpio_config(raw: str) -> GpioConfig:
+    first = _first_line(raw)
+    if first.startswith(("X ", "❌")):
+        _raise_if_missing_artifact(raw)
+        raise ToolExecutionError(first, detail=raw)
+    kv = _kv(raw)
+    if "No GPIO Configurations Found" in first:
+        return GpioConfig(
+            schematic_path=kv.get("Schematic"),
+            soc_family=kv.get("SOC Family Filter") or kv.get("SOC Family"),
+            total=0,
+            note="no GPIO configurations found",
+        )
+    if "GPIO Configuration Extraction" not in raw:
+        raise AdapterParseError(
+            f"unrecognized extract_gpio_config output: {first[:120]}", detail=raw
+        )
+    pins: list[GpioPin] = []
+    table = _table_in_section(raw, "GPIO Pin Details")
+    if table is not None:
+        for row in table.rows:
+            component = _row_get(table, row, "Component")
+            if not component:
+                continue
+            name, number = _pin_name_number(_row_get(table, row, "Pin"))
+            pins.append(
+                GpioPin(
+                    component=component,
+                    pin_name=name,
+                    pin_number=number,
+                    net=_row_get(table, row, "Net"),
+                    soc=_row_get(table, row, "SOC"),
+                )
+            )
+    total = _int(kv.get("Total GPIO Pins"))
+    return GpioConfig(
+        schematic_path=kv.get("Schematic"),
+        soc_family=kv.get("SOC Family"),
+        total=total if total is not None else len(pins),
+        pins=pins,
+    )
+
+
+@adapter("generate_device_tree", DeviceTreeArgs, "Device tree source from schematic")
+def parse_generate_device_tree(raw: str) -> DeviceTreeResult:
+    first = _first_line(raw)
+    if first.startswith(("X ", "❌")):
+        _raise_if_missing_artifact(raw)
+        raise ToolExecutionError(first, detail=raw)
+    if "Device Tree Generated Successfully" not in first:
+        raise AdapterParseError(
+            f"unrecognized generate_device_tree output: {first[:120]}", detail=raw
+        )
+    kv = _kv(raw)
+    return DeviceTreeResult(
+        schematic_path=kv.get("Schematic"),
+        target_soc=kv.get("Target SOC"),
+        output_path=kv.get("Output"),
+        gpio_pins=_int(kv.get("GPIO Pins")) or 0,
+        i2c_buses=_int(kv.get("I2C Buses")) or 0,
+        spi_buses=_int(kv.get("SPI Buses")) or 0,
+        uarts=_int(kv.get("UARTs")) or 0,
+        dts=_dts_block(raw),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Listing tools (footprints / routing / schematic components)
+# ---------------------------------------------------------------------------
+
+
+def _listing_total(raw: str) -> int | None:
+    m = re.search(r"^Total:\s*(\d+)", raw, re.M)
+    return int(m.group(1)) if m else None
+
+
+@adapter("list_pcb_footprints", PcbFootprintsArgs, "All footprints with position and layer")
+def parse_list_pcb_footprints(raw: str) -> PcbFootprints:
+    first = _first_line(raw)
+    if first.startswith(("Error", "❌")):
+        _raise_if_missing_artifact(raw)
+        raise ToolExecutionError(first, detail=raw)
+    if first == "No footprints found.":
+        return PcbFootprints(total=0, note="no footprints found")
+    path_match = re.match(r"^# Footprints in\s*(.+)$", first)
+    if not path_match:
+        raise AdapterParseError(
+            f"unrecognized list_pcb_footprints output: {first[:120]}", detail=raw
+        )
+    footprints: list[FootprintEntry] = []
+    table = next((t for t in _tables(raw) if t.col("Reference") is not None), None)
+    if table is not None:
+        for row in table.rows:
+            ref = _row_get(table, row, "Reference")
+            if not ref:
+                continue
+            pos = _FLOAT_RE.findall(_row_get(table, row, "Position"))
+            footprints.append(
+                FootprintEntry(
+                    reference=ref,
+                    value=_row_get(table, row, "Value"),
+                    # pcbnew parser emits a Library column; text parser Footprint.
+                    library=_row_get(table, row, "Library", "Footprint"),
+                    layer=_row_get(table, row, "Layer"),
+                    x_mm=float(pos[0]) if len(pos) >= 2 else None,
+                    y_mm=float(pos[1]) if len(pos) >= 2 else None,
+                    rotation_deg=_float(_row_get(table, row, "Rotation")),
+                    pads=_int(_row_get(table, row, "Pads")),
+                )
+            )
+    total = _listing_total(raw)
+    return PcbFootprints(
+        path=path_match.group(1).strip(),
+        total=total if total is not None else len(footprints),
+        footprints=footprints,
+    )
+
+
+def _count_dist(table: _Table | None, key_col: str, count_col: str = "Count") -> dict[str, int]:
+    dist: dict[str, int] = {}
+    if table is None:
+        return dist
+    for row in table.rows:
+        key = _row_get(table, row, key_col)
+        count = _int(_row_get(table, row, count_col))
+        if key and count is not None:
+            dist[key] = count
+    return dist
+
+
+@adapter("analyze_pcb_nets", FilePathArgs, "Routing analysis: widths, vias, layers, top nets")
+def parse_analyze_pcb_nets(raw: str) -> PcbRoutingReport:
+    first = _first_line(raw)
+    if first.startswith(("Error", "❌")):
+        _raise_if_missing_artifact(raw)
+        raise ToolExecutionError(first, detail=raw)
+    path_match = re.match(r"^# PCB Routing Analysis:\s*(.+)$", first)
+    if not path_match:
+        raise AdapterParseError(
+            f"unrecognized analyze_pcb_nets output: {first[:120]}", detail=raw
+        )
+    kv = _kv(raw)
+    degraded = _DEGRADED_MARKER in raw
+
+    board_match = re.search(
+        r"\*\*Board:\*\*\s*([\d.]+)\s*x\s*([\d.]+)\s*mm,\s*(\d+)\s*copper layers", raw
+    )
+    tracks_match = re.search(r"\*\*Tracks:\*\*\s*(\d+)\s*segments across\s*(\d+)\s*nets", raw)
+
+    spans: dict[str, int] = {}
+    for line in _section_body(raw, "Via Layer Spans").splitlines():
+        m = re.match(r"^-\s*(.+?):\s*(\d+)x\s*$", line.strip())
+        if m:
+            spans[m.group(1).strip()] = int(m.group(2))
+
+    top_nets: list[NetRouteStats] = []
+    top_table = _table_in_section(raw, "Top 20 Nets by Track Length")
+    if top_table is not None:
+        for row in top_table.rows:
+            net = _row_get(top_table, row, "Net")
+            if net:
+                top_nets.append(
+                    NetRouteStats(
+                        net=net,
+                        length_mm=_float(_row_get(top_table, row, "Length (mm)", "Length")),
+                        segments=_int(_row_get(top_table, row, "Segments")),
+                        widths=_row_get(top_table, row, "Widths"),
+                        layers=_row_get(top_table, row, "Layers"),
+                    )
+                )
+
+    warnings = [
+        line.strip().lstrip("⚠️").strip()
+        for line in raw.splitlines()
+        if line.strip().startswith("⚠️") and _DEGRADED_MARKER not in line
+    ]
+
+    return PcbRoutingReport(
+        path=path_match.group(1).strip(),
+        degraded=degraded,
+        board_width_mm=float(board_match.group(1)) if board_match else None,
+        board_height_mm=float(board_match.group(2)) if board_match else None,
+        copper_layers=int(board_match.group(3)) if board_match else None,
+        track_segments=(
+            int(tracks_match.group(1)) if tracks_match else _int(kv.get("Track Segments"))
+        ),
+        net_count=int(tracks_match.group(2)) if tracks_match else None,
+        via_count=_int(kv.get("Vias") or kv.get("Total vias")),
+        zone_count=_int(kv.get("Zones") or kv.get("Copper Zones")),
+        track_width_distribution=_count_dist(
+            _table_in_section(raw, "Track Width Distribution"), "Width"
+        ),
+        via_drill_distribution=_count_dist(
+            _table_in_section(raw, "Via Drill Distribution"), "Drill Size"
+        ),
+        via_layer_spans=spans,
+        segments_by_layer=_count_dist(
+            _table_in_section(raw, "Track Segments by Layer"), "Layer", "Segments"
+        ),
+        top_nets=top_nets,
+        min_track_width_mm=_float(kv.get("Min track width in design")),
+        default_track_width_mm=_float(kv.get("Default track width (design rules)")),
+        smallest_clearance_mm=_float(kv.get("Smallest clearance")),
+        warnings=warnings,
+    )
+
+
+@adapter(
+    "list_schematic_components",
+    SchematicComponentsArgs,
+    "All schematic components with value/footprint/DNP",
+)
+def parse_list_schematic_components(raw: str) -> SchematicComponents:
+    first = _first_line(raw)
+    if first.startswith(("Error", "❌")):
+        _raise_if_missing_artifact(raw)
+        raise ToolExecutionError(first, detail=raw)
+    if first == "No components found matching the specified criteria.":
+        return SchematicComponents(total=0, note="no components matched the filters")
+    path_match = re.match(r"^# Components in\s*(.+)$", first)
+    if not path_match:
+        raise AdapterParseError(
+            f"unrecognized list_schematic_components output: {first[:120]}", detail=raw
+        )
+    components: list[SchematicComponentEntry] = []
+    table = next((t for t in _tables(raw) if t.col("Reference") is not None), None)
+    if table is not None:
+        for row in table.rows:
+            ref = _row_get(table, row, "Reference")
+            if not ref:
+                continue
+            footprint = _row_get(table, row, "Footprint")
+            components.append(
+                SchematicComponentEntry(
+                    reference=ref,
+                    value=_row_get(table, row, "Value"),
+                    footprint=None if footprint in ("", "-") else footprint,
+                    library=_row_get(table, row, "Library"),
+                    # DNP / In BOM columns only appear when a non-default flag
+                    # exists somewhere in the listing; cells are blank otherwise.
+                    dnp=_row_get(table, row, "DNP").strip().lower() == "yes",
+                    in_bom=_row_get(table, row, "In BOM").strip().lower() != "no",
+                )
+            )
+    total = _listing_total(raw)
+    return SchematicComponents(
+        path=path_match.group(1).strip(),
+        total=total if total is not None else len(components),
+        components=components,
     )

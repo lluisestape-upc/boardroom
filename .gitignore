@@ -12,3 +12,4 @@ benchmark/corpus/downloads/
 *.kicad_prl
 fp-info-cache
 .DS_Store
+fixtures/

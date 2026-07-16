@@ -63,6 +63,15 @@ class MissingArtifactError(ToolExecutionError):
     kind: ClassVar[str] = "missing_artifact"
 
 
+class KicadCliMissingError(ToolExecutionError):
+    """kicad-cli was not found (PATH, ``KICAD_CLI`` env var, or the standard
+    install locations). Board rendering is impossible without it; the
+    orchestrator degrades the qwen3-vl layout critic to a
+    "visual critique not covered" note instead of failing the review."""
+
+    kind: ClassVar[str] = "kicad_cli_missing"
+
+
 class AdapterParseError(ToolExecutionError):
     """The tool returned output the adapter does not recognize. Raised
     instead of guessing, so unparsed text can never silently become

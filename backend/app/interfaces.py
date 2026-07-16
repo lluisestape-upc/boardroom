@@ -105,22 +105,31 @@ class ManifestBuilder(Protocol):
     async def build(self, project_path: str) -> dict: ...
 
 
-def load_agent_configs() -> list[AgentConfig]:
-    """Day 1 hardcoded two-specialist roster.
+_DAY1_FALLBACK = [
+    AgentConfig(name="connectivity_erc", model="qwen-flash",
+                prompt_path="society/prompts/connectivity_erc.md"),
+    AgentConfig(name="power_integrity", model="qwen-flash",
+                prompt_path="society/prompts/power_integrity.md"),
+]
 
-    Day 2 seam: replace the body with the society/registry.yaml loader
-    (society-engineer workstream) — the return shape must stay ``list[AgentConfig]``
-    so the Moderator is untouched by the swap.
+
+def load_agent_configs() -> list[AgentConfig]:
+    """The specialist roster from society/registry.yaml (the Moderator is excluded —
+    it is not a filing specialist). Falls back to the Day-1 two-agent roster if the
+    registry is unreadable. Return shape stays ``list[AgentConfig]`` so the Moderator
+    is untouched by the swap.
     """
-    return [
-        AgentConfig(
-            name="connectivity_erc",
-            model="qwen-flash",
-            prompt_path="society/prompts/connectivity_erc.md",
-        ),
-        AgentConfig(
-            name="power_integrity",
-            model="qwen-flash",
-            prompt_path="society/prompts/power_integrity.md",
-        ),
+    try:
+        from society.loader import load_registry
+    except Exception:
+        return list(_DAY1_FALLBACK)
+    try:
+        registry = load_registry()
+    except Exception:
+        return list(_DAY1_FALLBACK)
+    configs = [
+        AgentConfig(name=name, model=spec.model, prompt_path=spec.prompt)
+        for name, spec in registry.agents.items()
+        if name != "moderator"
     ]
+    return configs or list(_DAY1_FALLBACK)

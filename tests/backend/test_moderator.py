@@ -187,13 +187,11 @@ def test_validate_finding_direct():
     ))
 
 
-# -- Day 2 seams -----------------------------------------------------------------
+# -- Day 2 bounds (full negotiation coverage lives in test_negotiation.py) --------
 
 
-def test_day2_seams_are_stubbed_and_bounded(store):
+def test_negotiation_bounds_and_trivial_detection(store):
     moderator = make_moderator(store, FakeSpecialistRunner())
+    # A single finding can never overlap with anything.
     assert moderator.detect_conflicts([make_finding("A-1", "power_integrity")]) == []
-    session = store.create("p")
-    with pytest.raises(NotImplementedError):
-        run(moderator.run_debate(session, ({}, {})))
     assert MAX_DEBATE_ROUNDS == 2  # NEGOTIATION_PROTOCOL.md §3 hard limit

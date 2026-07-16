@@ -7,6 +7,7 @@ Seeed-Studio kicad-mcp-server:
 - ``mcp.adapters``  — typed (pydantic v2) adapters over the server's tools
 - ``mcp.evidence``  — per-session tool-output cache with stable evidence ids
 - ``mcp.allowlist`` — per-agent tool allowlists, enforced in code
+- ``mcp.render``    — .kicad_pcb -> PNG renders for the qwen3-vl layout critic
 - ``mcp.errors``    — typed errors the orchestrator can turn into
                       "scope not covered" notes
 

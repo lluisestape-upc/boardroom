@@ -1,0 +1,13 @@
+.git
+.venv
+venv
+__pycache__
+**/__pycache__
+.pytest_cache
+sessions
+fixtures
+node_modules
+report/node_modules
+benchmark/corpus/downloads
+.env
+*.png.tmp

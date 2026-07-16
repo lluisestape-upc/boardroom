@@ -1,435 +1,207 @@
 {
-  "session_id": "session-20260715-e3d8",
-  "project_name": "Antigravity Power Controller (v1.2)",
+  "session_id": "dead885162be",
+  "project_path": "fixtures/stickhub",
+  "finding_schema": "docs/schemas/finding.schema.json",
+  "protocol": {
+    "version": 1,
+    "max_debate_rounds": 2,
+    "extra_tool_calls_per_side_per_round": 1
+  },
   "findings": [
     {
       "id": "PI-001",
       "agent": "power_integrity",
-      "claim": "VCC_3V3 rail shows excessive voltage drop under transient load.",
-      "severity": "critical",
-      "evidence": [
-        {
-          "evidence_id": "EV-PI-001A",
-          "tool": "run_transient_sim",
-          "summary": "Simulated drop to 2.85V (13.6% droop) during 500mA load step on U1."
-        }
-      ],
-      "affected_nets": ["VCC_3V3"],
-      "affected_components": ["U1", "C12", "C13"],
-      "board_region": {
-        "x": 120,
-        "y": 145,
-        "w": 65,
-        "h": 50,
-        "image": "board.png"
-      },
-      "recommendation": "Increase local decoupling capacitance near U1 by replacing C12 and C13 with 10uF ceramic capacitors.",
-      "status": "upheld"
-    },
-    {
-      "id": "SI-001",
-      "agent": "signal_integrity",
-      "claim": "SPI_CLK line has excessive ringing due to trace impedance mismatch.",
+      "claim": "+5V rail has mixed copper widths (0.2 mm to 0.6 mm) and only 9 vias, risking voltage drop under load.",
       "severity": "major",
       "evidence": [
         {
-          "evidence_id": "EV-SI-001A",
-          "tool": "calculate_impedance",
-          "summary": "Calculated trace impedance of SPI_CLK is 72 ohms; driver output impedance is 24 ohms."
+          "evidence_id": "EV-0013",
+          "tool": "find_tracks_by_net",
+          "summary": "Net +5V: 120 segments, 87.696 mm on B.Cu, F.Cu, 9 vias, 2 zones, mixed widths"
         }
       ],
-      "affected_nets": ["SPI_CLK"],
-      "affected_components": ["U1", "U2", "R1"],
-      "board_region": {
-        "x": 210,
-        "y": 95,
-        "w": 180,
-        "h": 40,
-        "image": "board.png"
-      },
-      "recommendation": "Place a 33-ohm series termination resistor near driver U1 pin 12.",
-      "status": "merged",
-      "conflicts_with": ["DFM-001"],
-      "debate": [
-        {
-          "round": 1,
-          "agent": "signal_integrity",
-          "position": "A series termination resistor is critical to match the driver source impedance (24 ohms) to the line and prevent reflection-induced clock double-triggering.",
-          "new_evidence_id": null
-        },
-        {
-          "round": 1,
-          "agent": "dfm_layout",
-          "position": "Adding a series resistor near U1 pin 12 increases component density and creates clearance issues with adjacent high-density escape routing.",
-          "new_evidence_id": null
-        },
-        {
-          "round": 2,
-          "agent": "signal_integrity",
-          "position": "We can shift the resistor (R1) 1.5mm further out from the pin without significantly degrading the termination effectiveness, resolving density issues.",
-          "new_evidence_id": "EV-SI-001B"
-        },
-        {
-          "round": 2,
-          "agent": "dfm_layout",
-          "position": "If the resistor is shifted 1.5mm away, we can route it on the outer layer, which is manufacturable if we widen the trace to reduce intrinsic impedance.",
-          "new_evidence_id": "EV-DFM-001B"
-        }
+      "affected_nets": [
+        "+5V"
       ],
-      "ruling": {
-        "decision": "merged",
-        "rationale": "The Moderator merges the constraints: shift the series resistor (R1) 1.5mm from U1 pin 12 (satisfying SI termination requirements) and widen the SPI_CLK trace to 0.22mm (satisfying DFM impedance & spacing constraints).",
-        "cited_evidence_ids": ["EV-SI-001B", "EV-DFM-001B"]
-      }
-    },
-    {
-      "id": "DFM-001",
-      "agent": "dfm_layout",
-      "claim": "Trace width on SPI_CLK is too thin for 50-ohm impedance match.",
-      "severity": "major",
-      "evidence": [
-        {
-          "evidence_id": "EV-DFM-001A",
-          "tool": "check_clearance",
-          "summary": "Current trace width of 0.15mm results in 72-ohm characteristic impedance on 1.6mm 4-layer stackup."
-        }
-      ],
-      "affected_nets": ["SPI_CLK"],
-      "affected_components": ["U1", "U2"],
-      "recommendation": "Increase trace width of SPI_CLK to 0.25mm on Top Layer.",
-      "status": "merged",
-      "conflicts_with": ["SI-001"],
-      "debate": [
-        {
-          "round": 1,
-          "agent": "signal_integrity",
-          "position": "A series termination resistor is critical to match the driver source impedance (24 ohms) to the line and prevent reflection-induced clock double-triggering.",
-          "new_evidence_id": null
-        },
-        {
-          "round": 1,
-          "agent": "dfm_layout",
-          "position": "Adding a series resistor near U1 pin 12 increases component density and creates clearance issues with adjacent high-density escape routing.",
-          "new_evidence_id": null
-        },
-        {
-          "round": 2,
-          "agent": "signal_integrity",
-          "position": "We can shift the resistor (R1) 1.5mm further out from the pin without significantly degrading the termination effectiveness, resolving density issues.",
-          "new_evidence_id": "EV-SI-001B"
-        },
-        {
-          "round": 2,
-          "agent": "dfm_layout",
-          "position": "If the resistor is shifted 1.5mm away, we can route it on the outer layer, which is manufacturable if we widen the trace to reduce intrinsic impedance.",
-          "new_evidence_id": "EV-DFM-001B"
-        }
-      ],
-      "ruling": {
-        "decision": "merged",
-        "rationale": "The Moderator merges the constraints: shift the series resistor (R1) 1.5mm from U1 pin 12 (satisfying SI termination requirements) and widen the SPI_CLK trace to 0.22mm (satisfying DFM impedance & spacing constraints).",
-        "cited_evidence_ids": ["EV-SI-001B", "EV-DFM-001B"]
-      }
-    },
-    {
-      "id": "ERC-001",
-      "agent": "connectivity_erc",
-      "claim": "Unconnected input pin detected on microcontroller U1 pin 5.",
-      "severity": "major",
-      "evidence": [
-        {
-          "evidence_id": "EV-ERC-001A",
-          "tool": "run_erc",
-          "summary": "Pin 5 (GPIO_1/INT) is configured as input but has no driving source or pull resistor."
-        }
-      ],
-      "affected_nets": ["MCU_GPIO1"],
-      "affected_components": ["U1"],
-      "recommendation": "Add a 10k pull-down resistor to net MCU_GPIO1, or configure internal pull-down in firmware.",
-      "status": "upheld"
-    },
-    {
-      "id": "FW-001",
-      "agent": "firmware_bringup",
-      "claim": "MCU pin 5 is configured as active-high interrupt but lacks hardware pull-down.",
-      "severity": "minor",
-      "evidence": [
-        {
-          "evidence_id": "EV-FW-001A",
-          "tool": "inspect_dts",
-          "summary": "Device tree node gpios-interrupt sets pin 5 as high-level triggered with pull-up disabled."
-        }
-      ],
-      "affected_nets": ["MCU_GPIO1"],
-      "affected_components": ["U1"],
-      "recommendation": "Enable internal pull-down resistor in MCU initialization code, or route to ground.",
-      "status": "upheld"
+      "affected_components": [],
+      "recommendation": "Increase minimum copper width to 0.6 mm across all segments and add 3 more vias for better current distribution.",
+      "status": "open"
     },
     {
       "id": "PI-002",
       "agent": "power_integrity",
-      "claim": "LDO regulator U3 thermal dissipation is excessive under max load.",
-      "severity": "critical",
+      "claim": "+1V8 rail has mixed copper widths (0.15 mm to 0.3 mm) and only 2 vias, increasing risk of IR drop.",
+      "severity": "major",
       "evidence": [
         {
-          "evidence_id": "EV-PI-002A",
-          "tool": "calculate_thermal",
-          "summary": "U3 drops 5V to 1.8V at 400mA. Dissipation is 1.28W; junction temp exceeds 135C on SOT-23 package."
+          "evidence_id": "EV-0018",
+          "tool": "find_tracks_by_net",
+          "summary": "Net +1V8: 41 segments, 20.56 mm on B.Cu, F.Cu, 2 vias, 1 zones, mixed widths"
         }
       ],
-      "affected_nets": ["VCC_5V", "VCC_1V8"],
-      "affected_components": ["U3"],
-      "recommendation": "Add a copper pour area of at least 150 mm^2 connected to the GND pin of U3 for thermal relief.",
-      "status": "upheld"
+      "affected_nets": [
+        "+1V8"
+      ],
+      "affected_components": [],
+      "recommendation": "Standardize copper width to 0.3 mm minimum and add 2 additional vias to improve current handling.",
+      "status": "open"
+    },
+    {
+      "id": "DFM-001",
+      "agent": "dfm_layout",
+      "status": "open",
+      "severity": "major",
+      "title": "Silkscreen text over pads on USB connectors",
+      "description": "Silkscreen labels 'USB1' through 'USB7' and 'DP', 'DN', '+' are printed directly over solder pads of J1\u2013J8 and the bottom USB-A footprint. This risks solder mask misregistration, pad coverage loss, and tombstoning during reflow.",
+      "claim": "Silkscreen overlaps copper pads on multiple USB footprints",
+      "evidence": [
+        {
+          "evidence_id": "EV-0004",
+          "tool": "render_board",
+          "summary": "Top-layer render shows silkscreen text overlaid on pads of all USB connectors (J1\u2013J8) and bottom USB-A footprint."
+        }
+      ],
+      "board_region": {
+        "x": 0,
+        "y": 0,
+        "w": 168,
+        "h": 448,
+        "image": "StickHub_top.png"
+      },
+      "affected_components": [
+        "J1",
+        "J2",
+        "J5",
+        "J7",
+        "J8",
+        "D15",
+        "D16",
+        "D19",
+        "D20",
+        "D21"
+      ],
+      "recommendation": "Reposition all USB silkscreen labels at least 0.5 mm away from pad edges; use keepout layer or manual offset to ensure no overlap with copper."
     },
     {
       "id": "DFM-002",
       "agent": "dfm_layout",
-      "claim": "Thermal relief on U3 GND pin is missing, which could cause manufacturing defects.",
-      "severity": "minor",
-      "evidence": [
-        {
-          "evidence_id": "EV-DFM-002A",
-          "tool": "verify_thermal_relief",
-          "summary": "U3 pad 2 is directly connected to the solid ground plane without thermal spokes."
-        }
-      ],
-      "affected_nets": ["GND"],
-      "affected_components": ["U3"],
-      "recommendation": "Use standard 4-spoke thermal relief for U3 pad 2 connection to GND plane.",
-      "status": "upheld"
-    },
-    {
-      "id": "ERC-002",
-      "agent": "connectivity_erc",
-      "claim": "Power net VCC_5V is shorted to GND through misplaced copper island near C10.",
-      "severity": "critical",
-      "evidence": [
-        {
-          "evidence_id": "EV-ERC-002A",
-          "tool": "run_drc",
-          "summary": "Clearence error #42: Copper fill zone overlaps with VCC_5V via pads near C10."
-        }
-      ],
-      "affected_nets": ["VCC_5V", "GND"],
-      "affected_components": ["C10"],
-      "board_region": {
-        "x": 420,
-        "y": 280,
-        "w": 90,
-        "h": 90,
-        "image": "board.png"
-      },
-      "recommendation": "Remove the redundant copper zone connection on the bottom layer near C10.",
-      "status": "upheld"
-    },
-    {
-      "id": "SI-002",
-      "agent": "signal_integrity",
-      "claim": "Differential pair USB_D_P and USB_D_N trace lengths differ by 4.2mm.",
+      "status": "open",
       "severity": "major",
+      "title": "No fiducials on SMT board",
+      "description": "Board is SMT-assembled (multiple 0402, 2012, and fine-pitch connectors) but contains zero global or local fiducial marks. This will cause placement machine misalignment and yield loss.",
+      "claim": "No fiducial markers present on top layer",
       "evidence": [
         {
-          "evidence_id": "EV-SI-002A",
-          "tool": "measure_skew",
-          "summary": "Trace length difference: USB_D_P = 22.3mm, USB_D_N = 18.1mm. High-speed USB 2.0 skew exceeds 150ps."
+          "evidence_id": "EV-0004",
+          "tool": "render_board",
+          "summary": "Render shows no fiducial markers anywhere on top copper/silk layer."
         }
       ],
-      "affected_nets": ["USB_D_P", "USB_D_N"],
-      "affected_components": ["J1", "U1"],
-      "board_region": {
-        "x": 35,
-        "y": 320,
-        "w": 130,
-        "h": 60,
-        "image": "board.png"
-      },
-      "recommendation": "Length-match the USB differential traces to within 0.15mm by adding trace meanders near J1.",
-      "status": "upheld"
-    },
-    {
-      "id": "FW-002",
-      "agent": "firmware_bringup",
-      "claim": "I2C address conflict: EEPROM and Temp Sensor share address 0x50.",
-      "severity": "critical",
-      "evidence": [
-        {
-          "evidence_id": "EV-FW-002A",
-          "tool": "parse_i2c_addresses",
-          "summary": "EEPROM (U4) has hardwired address 0x50. Temp Sensor (U5) pin ADDR0 is tied to GND, setting address to 0x50."
-        }
-      ],
-      "affected_nets": ["I2C_SDA", "I2C_SCL"],
-      "affected_components": ["U4", "U5"],
-      "recommendation": "Change address select pin ADDR0 on Temp Sensor U5 to VCC to set its address to 0x51.",
-      "status": "upheld"
+      "board_region": null,
+      "affected_components": [],
+      "recommendation": "Add three non-plated circular fiducials (\u22651.0 mm diameter) at board corners, outside component courtyards, per IPC-7351."
     },
     {
       "id": "DFM-003",
       "agent": "dfm_layout",
-      "claim": "Component clearance between U4 and U5 is too small (0.2mm).",
+      "status": "open",
       "severity": "minor",
+      "title": "Missing polarity/pin-1 indicators on LEDs",
+      "description": "Duo LED footprints (D15, D16, D19, D20, D21) lack pin-1 or cathode markings in silkscreen or copper. Risk of reverse assembly for bi-color LEDs.",
+      "claim": "LED footprints have no polarity marking",
       "evidence": [
         {
-          "evidence_id": "EV-DFM-003A",
-          "tool": "check_clearance",
-          "summary": "Distance between bodies of U4 (SOIC-8) and U5 (MSOP-8) is 0.20mm, violating the 0.50mm minimum clearance limit."
+          "evidence_id": "EV-0004",
+          "tool": "render_board",
+          "summary": "LED footprints show symmetric silkscreen outlines with no polarity dot or notch."
         }
       ],
-      "affected_nets": [],
-      "affected_components": ["U4", "U5"],
       "board_region": {
-        "x": 310,
-        "y": 210,
-        "w": 85,
-        "h": 70,
-        "image": "board.png"
+        "x": 120,
+        "y": 320,
+        "w": 48,
+        "h": 24,
+        "image": "StickHub_top.png"
       },
-      "recommendation": "Move U5 1.5mm to the right to satisfy the 0.5mm clearance rule.",
-      "status": "upheld"
-    },
-    {
-      "id": "PI-003",
-      "agent": "power_integrity",
-      "claim": "Bypass capacitor C1 is placed too far (12mm) from MCU power pin.",
-      "severity": "major",
-      "evidence": [
-        {
-          "evidence_id": "EV-PI-003A",
-          "tool": "measure_distance",
-          "summary": "Distance from C1 pad 1 to U1 pin 1 (VCC) is 12.3mm. Recommended maximum is 3.0mm."
-        }
+      "affected_components": [
+        "D15",
+        "D16",
+        "D19",
+        "D20",
+        "D21"
       ],
-      "affected_nets": ["VCC_3V3"],
-      "affected_components": ["C1", "U1"],
-      "recommendation": "Move C1 to within 2mm of U1 pin 1.",
-      "status": "overruled",
-      "conflicts_with": ["DFM-004"],
-      "debate": [
-        {
-          "round": 1,
-          "agent": "power_integrity",
-          "position": "Bypass capacitor loop inductance will be too high if placed 12mm away, causing severe high-frequency voltage noise on the MCU core and potentially causing system resets.",
-          "new_evidence_id": null
-        },
-        {
-          "round": 1,
-          "agent": "dfm_layout",
-          "position": "Moving C1 close to U1 pin 1 blocks the escape routing channels of the 8-bit SPI high-speed data bus. The board will fail signal integrity and become unroutable on a 4-layer stackup.",
-          "new_evidence_id": null
-        },
-        {
-          "round": 2,
-          "agent": "power_integrity",
-          "position": "Can we place C1 on the bottom side of the PCB directly under U1 pin 1 to minimize distance without blocking the top layer signals?",
-          "new_evidence_id": "EV-PI-003B"
-        },
-        {
-          "round": 2,
-          "agent": "dfm_layout",
-          "position": "Placing C1 on the bottom side requires adding two vias. Vias add parasitic inductance (~1.2nH), which negates the benefit of closer proximity, and increases assembly costs.",
-          "new_evidence_id": "EV-DFM-004B"
-        }
-      ],
-      "ruling": {
-        "decision": "overruled",
-        "rationale": "The Moderator rules to overrule PI-003 and uphold DFM-004. Moving C1 to the top side blocks critical signal routing. A bottom-side placement is also rejected due to the inductance of the vias and manufacturing costs. C1 will remain in its original position, but a wider trace and dual ground vias will be added to minimize loop inductance.",
-        "cited_evidence_ids": ["EV-DFM-004B"]
-      }
+      "recommendation": "Add a silkscreen triangle or dot near pin 1 (cathode) of each Duo LED footprint; verify against LED datasheet polarity."
     },
     {
       "id": "DFM-004",
       "agent": "dfm_layout",
-      "claim": "Moving C1 closer to U1 pin 1 violates routing clearance of high-speed SPI bus.",
-      "severity": "major",
+      "status": "open",
+      "severity": "minor",
+      "title": "Crowded designator placement near connectors",
+      "description": "Designators 'USB1'\u2013'USB7' are placed too close to connector bodies, risking collision with adjacent parts or masking during assembly inspection.",
+      "claim": "Designators abut connector outlines, violating minimum clearance",
       "evidence": [
         {
-          "evidence_id": "EV-DFM-004A",
-          "tool": "check_clearance",
-          "summary": "Proposed placement of C1 conflicts with SPI_MISO, SPI_MOSI, SPI_CLK, and SPI_CS routing lines."
+          "evidence_id": "EV-0004",
+          "tool": "render_board",
+          "summary": "Designators abut connector outlines; e.g., 'USB1' overlaps J1 body edge."
         }
       ],
-      "affected_nets": ["VCC_3V3", "SPI_CLK"],
-      "affected_components": ["C1", "U1"],
-      "recommendation": "Keep C1 at current position but add a small ground via to minimize loop inductance.",
-      "status": "upheld",
-      "conflicts_with": ["PI-003"],
-      "debate": [
-        {
-          "round": 1,
-          "agent": "power_integrity",
-          "position": "Bypass capacitor loop inductance will be too high if placed 12mm away, causing severe high-frequency voltage noise on the MCU core and potentially causing system resets.",
-          "new_evidence_id": null
-        },
-        {
-          "round": 1,
-          "agent": "dfm_layout",
-          "position": "Moving C1 close to U1 pin 1 blocks the escape routing channels of the 8-bit SPI high-speed data bus. The board will fail signal integrity and become unroutable on a 4-layer stackup.",
-          "new_evidence_id": null
-        },
-        {
-          "round": 2,
-          "agent": "power_integrity",
-          "position": "Can we place C1 on the bottom side of the PCB directly under U1 pin 1 to minimize distance without blocking the top layer signals?",
-          "new_evidence_id": "EV-PI-003B"
-        },
-        {
-          "round": 2,
-          "agent": "dfm_layout",
-          "position": "Placing C1 on the bottom side requires adding two vias. Vias add parasitic inductance (~1.2nH), which negates the benefit of closer proximity, and increases assembly costs.",
-          "new_evidence_id": "EV-DFM-004B"
-        }
+      "board_region": {
+        "x": 80,
+        "y": 20,
+        "w": 88,
+        "h": 40,
+        "image": "StickHub_top.png"
+      },
+      "affected_components": [
+        "J1",
+        "J2",
+        "J5",
+        "J7",
+        "J8"
       ],
-      "ruling": {
-        "decision": "upheld",
-        "rationale": "The Moderator rules to overrule PI-003 and uphold DFM-004. Moving C1 to the top side blocks critical signal routing. A bottom-side placement is also rejected due to the inductance of the vias and manufacturing costs. C1 will remain in its original position, but a wider trace and dual ground vias will be added to minimize loop inductance.",
-        "cited_evidence_ids": ["EV-DFM-004B"]
-      }
+      "recommendation": "Offset all USB designators \u22650.75 mm from connector outlines; rotate or relocate to avoid courtyard intrusion."
     }
   ],
-  "token_accounting": [
-    {
-      "agent": "moderator",
-      "model": "qwen3-max",
-      "prompt_tokens": 12500,
-      "completion_tokens": 1820
+  "rulings": [],
+  "debates": [],
+  "rejected_findings": [],
+  "coverage_notes": [],
+  "token_accounting": {
+    "connectivity_erc/qwen-flash": {
+      "prompt": 25705,
+      "completion": 204,
+      "calls": 8
     },
-    {
-      "agent": "power_integrity",
-      "model": "qwen-flash",
-      "prompt_tokens": 8450,
-      "completion_tokens": 620
+    "signal_integrity/qwen-flash": {
+      "prompt": 43129,
+      "completion": 657,
+      "calls": 8
     },
-    {
-      "agent": "signal_integrity",
-      "model": "qwen-flash",
-      "prompt_tokens": 9200,
-      "completion_tokens": 710
+    "power_integrity/qwen-flash": {
+      "prompt": 27548,
+      "completion": 1014,
+      "calls": 7
     },
-    {
-      "agent": "connectivity_erc",
-      "model": "qwen-flash",
-      "prompt_tokens": 7100,
-      "completion_tokens": 490
+    "dfm_layout/qwen3-vl-plus": {
+      "prompt": 21537,
+      "completion": 3472,
+      "calls": 5
     },
-    {
-      "agent": "dfm_layout",
-      "model": "qwen3-vl",
-      "prompt_tokens": 11300,
-      "completion_tokens": 1150
-    },
-    {
-      "agent": "firmware_bringup",
-      "model": "qwen3-coder",
-      "prompt_tokens": 6200,
-      "completion_tokens": 820
+    "firmware_bringup/qwen3-coder-plus": {
+      "prompt": 9362,
+      "completion": 182,
+      "calls": 3
     }
-  ],
-  "coverage_notes": [
-    "Connectivity ERC: Verified all schematic net connections, pin types, and bidirectional interfaces. Identified one floating input.",
-    "Power Integrity: Completed DC drop analysis for 5.0V, 3.3V, and 1.8V rails. U3 LDO runs excessively hot.",
-    "Signal Integrity: Analyzed SPI clock line and USB high-speed lines. USB pair length skew detected.",
-    "DFM Layout: Checked spacing rules on components, board dimensions, and thermal relief connections. Identified U4/U5 clearance conflict.",
-    "Firmware Bringup: Inspected board pin map and device tree overlay configurations for hardware bring-up compatibility."
-  ]
+  },
+  "created_at": "2026-07-16T15:15:26.758547+00:00",
+  "signed_at": "2026-07-16T15:17:53.717581+00:00",
+  "render": {
+    "image": "StickHub_top.png",
+    "width_px": 168,
+    "height_px": 448,
+    "dpi": 300.0
+  },
+  "project_name": "StickHub USB Hub (KiCad demo) \u2014 live BoardRoom review"
 }

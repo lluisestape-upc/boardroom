@@ -6,7 +6,7 @@ mcp-engineer's tool layer) — Day 1 runs entirely against them.
 
 from __future__ import annotations
 
-from backend.app.interfaces import AgentConfig
+from backend.app.interfaces import AgentConfig, EvidenceRecord
 
 
 def make_finding(
@@ -91,6 +91,22 @@ class FakeSpecialistRunner:
 class FakeManifestBuilder:
     async def build(self, project_path: str) -> dict:
         return {"project_path": project_path, "kicad_files": ["board.kicad_pcb"], "builder": "fake"}
+
+
+class FakeToolLayer:
+    """Matches the ToolLayer protocol; hands out sequential debate evidence ids."""
+
+    def __init__(self, crash: bool = False):
+        self.calls: list[dict] = []
+        self.crash = crash
+
+    async def call_tool(self, *, agent: str, tool: str, arguments: dict) -> EvidenceRecord:
+        self.calls.append({"agent": agent, "tool": tool, "arguments": arguments})
+        if self.crash:
+            raise RuntimeError("tool layer exploded")
+        return EvidenceRecord(
+            evidence_id=f"ev-debate-{len(self.calls)}", tool=tool, output={"ok": True}
+        )
 
 
 TWO_SPECIALISTS = [

@@ -16,6 +16,7 @@ Also provides:
 """
 
 import asyncio
+import json
 import os
 import random
 from collections import defaultdict
@@ -52,6 +53,27 @@ def image_part(url: str) -> dict:
     (how mcp/render.py board PNGs are inlined for the qwen3-vl layout critic).
     """
     return {"type": "image_url", "image_url": {"url": url}}
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    """One tool call the model requested (arguments already JSON-parsed)."""
+
+    id: str
+    name: str
+    arguments: dict
+
+
+@dataclass(frozen=True)
+class AssistantTurn:
+    """A model turn in a tool-calling loop: free text and/or tool calls."""
+
+    content: str | None
+    tool_calls: list[ToolCall]
+
+    @property
+    def wants_tools(self) -> bool:
+        return bool(self.tool_calls)
 
 
 @dataclass
@@ -163,6 +185,56 @@ class QwenClient:
             **kwargs,
         )
 
+    async def chat_with_tools(
+        self,
+        *,
+        agent: str,
+        model: str,
+        messages: list[dict],
+        tools: list[dict],
+        tool_choice: str = "auto",
+        **kwargs: Any,
+    ) -> AssistantTurn:
+        """One completion that may request tool calls (function calling).
+
+        Returns an :class:`AssistantTurn` (content + parsed tool calls). Same
+        retry/backoff and token accounting as :meth:`chat`. The specialist loop
+        executes the tool calls and appends the results, then calls again.
+        """
+        request: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "tools": tools,
+            "tool_choice": tool_choice,
+            **kwargs,
+        }
+        attempt = 0
+        while True:
+            try:
+                resp = await self._client.chat.completions.create(**request)
+                break
+            except (openai.APIStatusError, openai.APIConnectionError) as exc:
+                retryable = isinstance(exc, openai.APIConnectionError) or _retryable_status(exc)
+                if not retryable or attempt >= self.max_retries:
+                    raise
+                delay = min(self.backoff_cap, self.backoff_base * (2**attempt))
+                delay += random.uniform(0, delay * 0.1)
+                attempt += 1
+                await asyncio.sleep(delay)
+
+        usage = resp.usage
+        if usage is not None:
+            self.ledger.record(agent, model, usage.prompt_tokens, usage.completion_tokens)
+        msg = resp.choices[0].message
+        calls: list[ToolCall] = []
+        for tc in getattr(msg, "tool_calls", None) or []:
+            try:
+                args = json.loads(tc.function.arguments or "{}")
+            except (json.JSONDecodeError, TypeError):
+                args = {}
+            calls.append(ToolCall(id=tc.id, name=tc.function.name, arguments=args))
+        return AssistantTurn(content=msg.content, tool_calls=calls)
+
 
 class MockQwenClient:
     """Drop-in test double for QwenClient. No network, no API key.
@@ -179,6 +251,7 @@ class MockQwenClient:
         self.ledger = ledger or TokenLedger()
         self.calls: list[dict] = []
         self._responses: dict[str, list[str]] = {}
+        self._tool_turns: dict[str, list[AssistantTurn]] = {}
         self.default_response: str | None = None
 
     def register(self, agent: str, response: str | list[str]) -> "MockQwenClient":
@@ -235,3 +308,31 @@ class MockQwenClient:
 
     def calls_for(self, agent: str) -> list[dict]:
         return [c for c in self.calls if c["agent"] == agent]
+
+    def register_tool_turns(self, agent: str, turns: list[AssistantTurn]) -> "MockQwenClient":
+        """Queue an ordered script of AssistantTurns for chat_with_tools. Chainable."""
+        self._tool_turns.setdefault(agent, []).extend(turns)
+        return self
+
+    async def chat_with_tools(
+        self,
+        *,
+        agent: str,
+        model: str,
+        messages: list[dict],
+        tools: list[dict],
+        tool_choice: str = "auto",
+        **kwargs: Any,
+    ) -> AssistantTurn:
+        self.calls.append(
+            {"agent": agent, "model": model, "messages": messages, "tools": tools, "kwargs": kwargs}
+        )
+        script = self._tool_turns.get(agent)
+        if script:
+            turn = script.pop(0) if len(script) > 1 else script[0]
+        else:
+            # No script → a terminal empty-findings turn, so loops always end.
+            turn = AssistantTurn(content="[]", tool_calls=[])
+        text_len = sum(len(str(m.get("content", ""))) for m in messages)
+        self.ledger.record(agent, model, max(1, text_len // 4), max(1, len(turn.content or "") // 4))
+        return turn

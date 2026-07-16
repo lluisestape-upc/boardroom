@@ -1,0 +1,83 @@
+# BoardRoom benchmark corpus.
+#
+# Boards are the stock KiCad demo projects shipped with a local KiCad install.
+# They are GPL/CC-licensed and we deliberately DO NOT redistribute them in this
+# repo. `fetch.py` copies them out of the local KiCad install into
+# corpus/boards/<id>/ (gitignored). Ground truth for each seeded board is written
+# by seed.py to corpus/ground_truth/<id>.json.
+#
+# Each entry:
+#   id           stable board id used everywhere (ground truth, results, charts)
+#   demo         demo project directory name under <kicad>/share/kicad/demos/
+#   schematic    root .kicad_sch filename (the sheet seeds mutate)
+#   pcb          .kicad_pcb filename
+#   complexity   small | medium | large  (rough review effort)
+#   note         one-line description + why it's in the corpus
+
+version: 1
+
+# Standard install locations probed by fetch.py (first hit wins). fetch.py also
+# accepts --kicad-share to override.
+install_globs:
+  - "C:/Program Files/KiCad/*/share/kicad/demos"
+  - "C:/Program Files (x86)/KiCad/*/share/kicad/demos"
+  - "/usr/share/kicad/demos"
+  - "/Applications/KiCad/KiCad.app/Contents/SharedSupport/demos"
+
+boards:
+  - id: stickhub
+    demo: stickhub
+    schematic: StickHub.kicad_sch
+    pcb: StickHub.kicad_pcb
+    complexity: medium
+    note: >-
+      7-port USB hub (RobotProtos). Dense decoupling (38 caps, mostly 0.1uF) and
+      13 resistors, USB differential pairs. No I2C bus or enable-net labels, so it
+      exercises the seed skip path as well as decoupling-cap removal.
+
+  - id: pic_programmer
+    demo: pic_programmer
+    schematic: pic_programmer.kicad_sch
+    pcb: pic_programmer.kicad_pcb
+    complexity: small
+    note: >-
+      Classic PIC programmer. Small mixed analog/digital board (6 caps, 21
+      resistors) with a VPP/MCLR programming rail. Good low-component baseline.
+
+  - id: ecc83_pp
+    demo: ecc83
+    schematic: ecc83-pp.kicad_sch
+    pcb: ecc83-pp.kicad_pcb
+    complexity: small
+    note: >-
+      ECC83 valve push-pull preamp. Pure analog, only 2 caps / 4 resistors and no
+      digital buses -- most seeds correctly report "not applicable" here, which is
+      itself a useful honesty check on the seeder.
+
+  - id: interf_u
+    demo: interf_u
+    schematic: interf_u.kicad_sch
+    pcb: interf_u.kicad_pcb
+    complexity: medium
+    note: >-
+      ISA-bus interface card. 200+ net labels including a RESET/enable buffer net
+      (ENBBUF, RSTL) -- primary target for the float_enable_pin seed.
+
+  - id: cm5_minima
+    demo: cm5_minima
+    schematic: CM5_MINIMA_3.kicad_sch
+    pcb: CM5_MINIMA_3.kicad_pcb
+    complexity: large
+    note: >-
+      Raspberry Pi CM5 carrier. Hierarchical design with I2C sheet pins
+      (SDA/SCL, SDA0/SCL0), power symbols (+1V8, +3V3_PI, +5V) and RST nets --
+      the one board that exercises the I2C-swap, I2C-pullup and rail-rename seeds.
+
+  - id: kit_dev_coldfire
+    demo: kit-dev-coldfire-xilinx_5213
+    schematic: kit-dev-coldfire-xilinx_5213.kicad_sch
+    pcb: kit-dev-coldfire-xilinx_5213.kicad_pcb
+    complexity: medium
+    note: >-
+      Freescale ColdFire + Xilinx dev kit. 19 caps, 25 resistors, RSTI-/RSTO-
+      reset nets. Medium-density digital board for decoupling + reset seeds.
