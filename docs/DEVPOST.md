@@ -1,7 +1,7 @@
 # Devpost Submission — BoardRoom
 
-Paste-ready copy for the Devpost form. Fill ⟦placeholders⟧ from the real benchmark
-before submitting.
+Paste-ready copy for the Devpost form. Benchmark numbers are final (measured, n=2 runs).
+The only thing left to fill is the YouTube URL at the bottom, after recording.
 
 ---
 
@@ -56,11 +56,33 @@ BoardRoom runs a review as a society of agents:
 - `deploy/alibaba/oss_store.py` — OSS object storage via the official `oss2` SDK.
 - `deploy/Dockerfile` — backend + KiCad container for ECS.
 
-## Results ⟦fill from benchmark/results⟧
-On ⟦N⟧ KiCad boards with ⟦M⟧ seeded defects: the society caught **⟦X%⟧** of seeded
-defects vs. **⟦Y%⟧** for a single monolithic agent, with **⟦Z%⟧** fewer false
-positives and **⟦W%⟧** lower token cost. Hallucination rate: society **⟦a%⟧** vs.
-baseline **⟦b%⟧**.
+## Results
+6 KiCad boards, 12 reproducibly seeded defects, **two independent runs per config**
+(LLMs are nondeterministic — one run isn't a measurement). Full method, limitations and
+raw numbers: [docs/BENCHMARK.md](docs/BENCHMARK.md).
+
+| | society | baseline (1× qwen3-max, all tools) |
+|---|---|---|
+| Seeded-defect recall (mean) | **0.29** | 0.21 |
+| Cost per full corpus | **$0.147** | $0.429 |
+| Prompt tokens | 792K | 312K |
+| Findings surfaced | 49–56 | 6–10 |
+| Hallucination rate | **0.00** | 0.00 |
+
+**~2.9× cheaper while consuming 2.5× MORE tokens.** That inversion is the whole thesis:
+five `qwen-flash` specialists doing more total work cost far less than one `qwen3-max`
+generalist doing less. Routing by role beats routing by model size.
+
+We deliberately do **not** claim a detection win: the society led in both runs, but by
+exactly one defect out of twelve — within run-to-run noise, and we say so. The robust
+results are cost, coverage (~9×), and a **0.00 hallucination rate enforced
+architecturally** — a finding citing no tool evidence is rejected at the boundary, not
+merely discouraged in a prompt.
+
+Absolute recall is low for *both* configs because most seeded defect classes are
+invisible to the available tools: a removed decoupling cap is an *absence* no KiCad tool
+reports, and a swapped SDA/SCL is electrically valid so ERC stays silent. That's a
+finding about EDA tooling, and we report it rather than hide it.
 
 ## Challenges
 - Keeping specialists honest: the evidence-citation gate and in-code tool allowlists

@@ -20,7 +20,7 @@ from mcp.allowlist import AllowlistRegistry
 from mcp.client import KicadMCPClient
 from mcp.evidence import EvidenceCache
 
-from .interfaces import load_agent_configs
+from .interfaces import AgentConfig, load_agent_configs
 from .moderator import Moderator
 from .qwen_client import QwenClient
 from .runner import McpManifestBuilder, ToolDrivenSpecialistRunner
@@ -73,7 +73,11 @@ async def run_baseline_review(project_dir: str, *, sessions_dir: str | None = No
     """Single-agent baseline: one qwen3-max agent with ALL tools reviews the whole
     board. Same review.json shape as run_review, for the benchmark comparison.
     """
-    registry = AllowlistRegistry()
+    # Fair baseline: it must genuinely get EVERY tool. society/registry.yaml scopes
+    # "moderator" down to 3 overview tools, so point the registry at a nonexistent
+    # file to fall back on DEFAULT_ALLOWLIST, where moderator is a wildcard (= all
+    # registered adapters). A tool-starved baseline would be a strawman.
+    registry = AllowlistRegistry(registry_path=Path(project_dir) / "__no_registry__.yaml")
     cache = EvidenceCache(session_id=Path(project_dir).name + "-baseline")
     client = QwenClient()
 
@@ -82,7 +86,6 @@ async def run_baseline_review(project_dir: str, *, sessions_dir: str | None = No
             session=mcp_session, cache=cache, registry=registry, model_client=client,
             max_tool_rounds=16,  # one agent covers everything, so allow more tool calls
         )
-        # name "moderator" → wildcard allowlist (all tools); generalist prompt.
         cfg = AgentConfig(name="moderator", model="qwen3-max",
                           prompt_path="society/prompts/_baseline.md")
         manifest_builder = McpManifestBuilder(session=mcp_session, cache=cache, registry=registry)

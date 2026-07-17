@@ -75,10 +75,13 @@ model that actually *sees* the board render — boxes each defect right on the c
 
 **On screen:** the comparison chart — society vs. single-agent baseline.
 
-**VO:** "And it's measurably better than a single big agent. On a corpus of KiCad
-boards with known seeded defects, the society caught ⟦X%⟧ of them versus ⟦Y%⟧ for one
-monolithic agent, with ⟦Z%⟧ fewer false positives — and ⟦N%⟧ lower token cost, because
-five cheap specialists beat one expensive generalist." ⟦fill from benchmark/results⟧
+**VO:** "So is a society actually better than one big agent? We measured it — two runs
+each, same boards, same seeded defects. Here's the honest answer. Recall is comparable:
+the society edged it by one defect out of twelve, which is within noise. But look at
+cost. The society burns two and a half times MORE tokens — and costs nearly three times
+LESS. Five cheap specialists doing more work beat one expensive generalist doing less.
+And both hallucinated exactly zero times, because a finding without cited evidence
+can't be filed at all."
 
 ## 2:45–3:00 — Close (Alibaba Cloud + wrap)
 

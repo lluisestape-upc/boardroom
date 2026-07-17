@@ -2155,3 +2155,130 @@ def parse_list_schematic_components(raw: str) -> SchematicComponents:
         total=total if total is not None else len(components),
         components=components,
     )
+
+
+# ---------------------------------------------------------------------------
+# Schematic net + symbol inspection
+#
+# These two tools are referenced by society/registry.yaml but their adapters
+# landed late; without them the specialists silently lost schematic-level
+# visibility (specs_for_tools skips tools that have no adapter). list_schematic_nets
+# is what exposes a renamed/floating rail at the schematic level.
+# ---------------------------------------------------------------------------
+
+
+class SymbolDetailsArgs(_Args):
+    file_path: str
+    reference: str
+
+
+class SchematicNetEntry(BaseModel):
+    name: str
+    type: str = ""
+    code: str = ""
+
+
+class SchematicNets(ToolReport):
+    path: str | None = None
+    total: int | None = None
+    nets: list[SchematicNetEntry] = []
+
+    def summary(self) -> str:
+        names = ", ".join(n.name for n in self.nets[:10])
+        more = "..." if len(self.nets) > 10 else ""
+        return f"{self.total if self.total is not None else len(self.nets)} schematic nets: {names}{more}"
+
+
+@adapter("list_schematic_nets", FilePathArgs, "All net names/labels declared in a schematic")
+def parse_list_schematic_nets(raw: str) -> SchematicNets:
+    first = _first_line(raw)
+    if first.startswith("❌") or first.startswith("Error"):
+        _raise_if_missing_artifact(raw)
+        raise ToolExecutionError(first, detail=raw)
+
+    m = re.search(r"^#\s*Nets in\s+(.+)$", raw, re.M)
+    total = None
+    tm = re.search(r"^Total:\s*(\d+)\s*net", raw, re.M)
+    if tm:
+        total = int(tm.group(1))
+
+    nets: list[SchematicNetEntry] = []
+    for table in _tables(raw):
+        i_name = table.col("Net Name")
+        if i_name is None:
+            continue
+        i_type, i_code = table.col("Type"), table.col("Code")
+        for row in table.rows:
+            if len(row) <= i_name or not row[i_name].strip():
+                continue
+            nets.append(
+                SchematicNetEntry(
+                    name=row[i_name].strip(),
+                    type=row[i_type].strip() if i_type is not None and len(row) > i_type else "",
+                    code=row[i_code].strip() if i_code is not None and len(row) > i_code else "",
+                )
+            )
+    return SchematicNets(
+        path=m.group(1).strip() if m else None,
+        total=total if total is not None else len(nets),
+        nets=nets,
+    )
+
+
+class SymbolPin(BaseModel):
+    number: str
+    name: str = ""
+    type: str = ""
+
+
+class SymbolDetails(ToolReport):
+    reference: str
+    value: str = ""
+    library: str = ""
+    footprint: str = ""
+    position: str = ""
+    pins: list[SymbolPin] = []
+
+    def summary(self) -> str:
+        return (
+            f"{self.reference}: value={self.value or '?'}, lib={self.library or '?'}, "
+            f"{len(self.pins)} pins"
+        )
+
+
+@adapter("get_symbol_details", SymbolDetailsArgs, "Value/library/footprint/pins of one schematic symbol")
+def parse_get_symbol_details(raw: str) -> SymbolDetails:
+    first = _first_line(raw)
+    if first.startswith("❌") or first.startswith("Error"):
+        _raise_if_missing_artifact(raw)
+        raise ToolExecutionError(first, detail=raw)
+
+    m = re.search(r"^#\s*Symbol Details:\s*(.+)$", raw, re.M)
+    if m is None:
+        raise AdapterParseError("no '# Symbol Details:' heading", detail=raw[:200])
+    kv = _kv(raw)
+
+    pins: list[SymbolPin] = []
+    for table in _tables(raw):
+        i_pin = table.col("Pin")
+        if i_pin is None:
+            continue
+        i_name, i_type = table.col("Name"), table.col("Type")
+        for row in table.rows:
+            if len(row) <= i_pin or not row[i_pin].strip():
+                continue
+            pins.append(
+                SymbolPin(
+                    number=row[i_pin].strip(),
+                    name=row[i_name].strip() if i_name is not None and len(row) > i_name else "",
+                    type=row[i_type].strip() if i_type is not None and len(row) > i_type else "",
+                )
+            )
+    return SymbolDetails(
+        reference=m.group(1).strip(),
+        value=kv.get("Value", ""),
+        library=kv.get("Library", ""),
+        footprint=kv.get("Footprint", ""),
+        position=kv.get("Position", ""),
+        pins=pins,
+    )

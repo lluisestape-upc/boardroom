@@ -171,8 +171,14 @@ class ToolDrivenSpecialistRunner:
             {
                 "role": "user",
                 "content": (
-                    "Output ONLY the JSON array of findings now, each citing evidence_id(s) "
-                    "you received. Return [] if nothing actionable."
+                    "Output ONLY the JSON array of findings now. Requirements:\n"
+                    "1. Each finding cites evidence_id(s) you actually received.\n"
+                    "2. MANDATORY: if your claim names any net (e.g. +3V3, VCC_PIC, SDA) put "
+                    "those exact net names in `affected_nets`. If it names any reference "
+                    "designator (e.g. U3, C12, R7) put those in `affected_components`. A claim "
+                    "that mentions a net or part while leaving these arrays empty is INVALID — "
+                    "the review's impact graph is built from these fields, not from your prose.\n"
+                    "3. Return [] if nothing actionable."
                 ),
             }
         )

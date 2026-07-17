@@ -59,11 +59,28 @@ def _severity_within_one(a: str, b: str) -> bool:
     return abs(SEVERITY_ORDER.index(a) - SEVERITY_ORDER.index(b)) <= 1
 
 
+def _norm_name(name: str) -> str:
+    """Normalize a net/designator for comparison.
+
+    KiCad names the same net either bare (``VCC_PIC``) or hierarchically qualified
+    (``/pic_sockets/VCC_PIC``), and reviewers legitimately use either form. Compare
+    on the last path segment, case-insensitively, so a correct answer isn't scored
+    wrong on a naming convention. Applied identically to both configs.
+    """
+    return str(name).strip().rsplit("/", 1)[-1].upper()
+
+
+def _norm_set(names) -> set[str]:
+    return {_norm_name(n) for n in (names or []) if str(n).strip()}
+
+
 def match_finding(finding: dict, defect: GroundTruthDefect) -> bool:
     """True if ``finding`` matches ``defect`` per the documented matcher."""
-    nets = set(finding.get("affected_nets") or [])
-    comps = set(finding.get("affected_components") or [])
-    location = bool(nets & set(defect.affected_nets)) or bool(comps & set(defect.affected_refs))
+    nets = _norm_set(finding.get("affected_nets"))
+    comps = _norm_set(finding.get("affected_components"))
+    location = bool(nets & _norm_set(defect.affected_nets)) or bool(
+        comps & _norm_set(defect.affected_refs)
+    )
     if not location:
         return False
     agent_match = finding.get("agent") == defect.expected_agent
@@ -247,7 +264,9 @@ def aggregate(results: list[MetricsResult], *, config: str, board_id: str = "ALL
 def to_markdown_table(results: list[MetricsResult]) -> str:
     """Render one or more MetricsResults as a comparison markdown table."""
     header = (
-        "| Config | Board | Recall | Defects | False+ | Halluc. | "
+        # "Unmatched", not "False+": the demo boards carry real pre-existing defects we
+        # never seeded, so a genuine catch lands here too. Descriptive, not an error rate.
+        "| Config | Board | Recall | Defects | Unmatched | Halluc. | "
         "Prompt tok | Compl. tok | Cost $ | Wall s |"
     )
     sep = "|---|---|---|---|---|---|---|---|---|---|"
