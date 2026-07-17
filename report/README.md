@@ -69,3 +69,19 @@ app.mount("/report", StaticFiles(directory="report/dist", html=True), name="repo
    - Sums the prompt/completion tokens consumed by each specialized agent.
    - Computes realistic cost metrics based on the pricing tier of Qwen models (`qwen3-max` vs. `qwen-flash` vs. `qwen3-vl`).
    - Renders custom horizontal stacked bar charts in pure HTML/CSS.
+
+## Which sample am I looking at? (updated 2026-07-17)
+
+- **`sample/review.sample.json`** *(the default that boots on `file://`)* — a **REAL**
+  BoardRoom review of the KiCad **StickHub** demo board, produced by the live society
+  against the KiCad MCP server. It has **0 debates**: no two specialists filed
+  conflicting findings on that board, so the negotiation never triggered.
+- **`sample/review.debate-example.json`** — **SYNTHETIC, hand-authored** fixture whose
+  only purpose is to exercise the **debate viewer** (4 contested findings with full
+  2-round transcripts and rulings). The negotiation engine it depicts is real and
+  unit-tested, but no board in the benchmark corpus produced a real conflict, so there
+  is no authentic transcript to ship. Drag this file onto the dashboard to see that view.
+
+Keeping these separate and labeled is deliberate: the real review shows what the system
+actually did; the synthetic file shows a mechanism we built but couldn't demonstrate on
+real data. Don't present the synthetic one as a real result.

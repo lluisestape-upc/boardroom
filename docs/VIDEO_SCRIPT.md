@@ -49,17 +49,25 @@ tools in its lane — enforced in code, not by prompting. Every tool result beco
 cited piece of evidence. A finding with no evidence is rejected automatically — that's
 how we keep hallucinations out." ⟦state real accepted/rejected count⟧
 
-## 1:10–1:50 — The negotiation (the money shot)
+## 1:10–1:50 — The negotiation protocol
 
-**On screen:** the report UI **Debate viewer** for a contested finding — Signal
-Integrity vs. DFM/Layout on the same net. Show the two rounds, the extra evidence
-each pulls, then the Moderator's ruling with cited evidence highlighted.
+> ⚠️ **HONESTY CONSTRAINT — read before recording.** The negotiation engine is real,
+> bounded and unit-tested (13 tests), but **no board in our benchmark corpus produced a
+> conflicting pair of findings**, so we have NO real debate transcript. Do **not** imply
+> this footage is a live debate. Load `report/sample/review.debate-example.json` (clearly
+> labeled synthetic) to show the viewer, and say so out loud — the VO below does.
 
-**VO:** "Here's what makes it a society. Signal Integrity wants a wider trace and a
-ground pour. DFM objects — that violates the fab's clearance rule. They each get two
-rounds and one extra measurement to back their case. Then the Moderator rules on
-*evidence*, not eloquence — and records exactly which measurement decided it." ⟦read
-the real ruling rationale⟧
+**On screen:** the report UI **Debate viewer** loaded with the synthetic example — the
+title bar reads "SYNTHETIC EXAMPLE", leave it visible. Show the two rounds, the extra
+evidence each side pulls, the Moderator's ruling with cited evidence highlighted.
+
+**VO:** "When two specialists collide — Signal Integrity wants a wider trace, DFM says
+that breaks the fab's clearance rule — the Moderator opens a bounded debate: two rounds,
+one extra measurement per side, then it rules on *evidence*, not eloquence, and records
+which measurement decided it. Full disclosure: this transcript is synthetic. The engine
+is real and tested, but across our whole benchmark corpus the specialists never actually
+disagreed — their scopes are narrow enough that conflicts are rare. That's an honest
+result about the design, and we'd rather show you the mechanism than fake a fight."
 
 ## 1:50–2:20 — The blast-radius report
 
