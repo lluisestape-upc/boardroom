@@ -31,13 +31,20 @@
   let boardCtx = null;
   let boardHoveredFinding = null;
 
-  // Pricing constants (USD per 1000 tokens)
+  /* Pricing constants (USD per 1000 tokens).
+     MUST stay in sync with COST_PER_MTOK in backend/app/qwen_client.py, which is
+     quoted per 1M tokens — divide those by 1000. Otherwise this panel contradicts
+     the benchmark figures in the README. Both are PLACEHOLDER rates: verify against
+     Model Studio pricing before quoting absolute dollars. */
   const PRICING = {
-    'qwen3-max': { prompt: 0.02, completion: 0.06 },      // Moderator
-    'qwen-flash': { prompt: 0.001, completion: 0.002 },   // PI, SI, ERC
-    'qwen3-vl': { prompt: 0.003, completion: 0.009 },      // DFM Layout
-    'qwen3-coder': { prompt: 0.002, completion: 0.006 },   // FW Bringup
-    'default': { prompt: 0.002, completion: 0.005 }
+    'qwen3-max': { prompt: 0.0012, completion: 0.0060 },        // Moderator
+    'qwen-flash': { prompt: 0.00005, completion: 0.0004 },      // PI, SI, ERC
+    'qwen3-vl-plus': { prompt: 0.0002, completion: 0.0016 },    // DFM Layout
+    'qwen3-coder-plus': { prompt: 0.0003, completion: 0.0015 }, // FW Bring-up
+    // tolerate model ids written without the -plus suffix
+    'qwen3-vl': { prompt: 0.0002, completion: 0.0016 },
+    'qwen3-coder': { prompt: 0.0003, completion: 0.0015 },
+    'default': { prompt: 0.0002, completion: 0.0010 }
   };
 
   // --- INITIALIZATION ---
@@ -1236,15 +1243,39 @@
   }
 
   // --- VIEW 5: TOKEN PANEL METRICS & BILLING ---
+
+  /* The backend's real review.json emits token_accounting as the ledger snapshot:
+     { "<agent>/<model>": { prompt, completion, calls }, ... }
+     Older hand-authored fixtures used an array of
+     { agent, model, prompt_tokens, completion_tokens }.
+     The schema is frozen, so normalise here rather than touching the data. */
+  function normaliseTokenAccounting(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    return Object.entries(raw).map(([key, v]) => {
+      const slash = key.lastIndexOf('/');
+      return {
+        agent: slash === -1 ? key : key.slice(0, slash),
+        model: slash === -1 ? '' : key.slice(slash + 1),
+        prompt_tokens: v.prompt_tokens ?? v.prompt ?? 0,
+        completion_tokens: v.completion_tokens ?? v.completion ?? 0,
+        calls: v.calls ?? 0,
+      };
+    });
+  }
+
   function populateTokenAccounting() {
     if (!reviewData || !reviewData.token_accounting) return;
+
+    const accounting = normaliseTokenAccounting(reviewData.token_accounting);
+    if (!accounting.length) return;
 
     let totalPrompt = 0;
     let totalCompletion = 0;
     let totalEstimatedCost = 0.0;
-    
+
     // Sum tokens and calculate costs
-    reviewData.token_accounting.forEach(acc => {
+    accounting.forEach(acc => {
       totalPrompt += acc.prompt_tokens;
       totalCompletion += acc.completion_tokens;
       
@@ -1264,9 +1295,9 @@
     chartContainer.innerHTML = '';
 
     // Find maximum tokens per agent to scale the bars correctly
-    const maxAgentTokens = Math.max(...reviewData.token_accounting.map(a => a.prompt_tokens + a.completion_tokens));
+    const maxAgentTokens = Math.max(...accounting.map(a => a.prompt_tokens + a.completion_tokens));
 
-    reviewData.token_accounting.forEach(acc => {
+    accounting.forEach(acc => {
       const agentTotal = acc.prompt_tokens + acc.completion_tokens;
       const promptPct = (acc.prompt_tokens / maxAgentTokens) * 100;
       const compPct = (acc.completion_tokens / maxAgentTokens) * 100;

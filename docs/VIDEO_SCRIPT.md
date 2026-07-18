@@ -8,133 +8,133 @@ Target ~3:00, uploaded **public** to YouTube. Record 1920×1080, dark theme.
 > terminal commands below (`pytest`, printing a saved review) make **zero** network
 > calls.
 
+**Narrative rule:** who I am → what it does → what it found → *only then* how it works
+→ proof → close. Never show the architecture before the viewer knows what the thing
+does; nobody can follow a diagram for a tool they haven't seen yet.
+
 ---
 
 ## Before you hit record (10 min)
 
-Open these four things:
+Open these in separate tabs/windows so you can cut between them without fumbling:
 
-1. **The report** — double-click
-   `report/dist/index.html`
-   It boots with the **real** StickHub review already loaded (shows "6 Filed").
-   Hard-refresh once (**Ctrl+Shift+R**) so you get the latest build.
-2. **Benchmark chart** — `benchmark/results/comparison_chart.png`
+1. **Title card** — `docs/title-card.html` → **F11** fullscreen, press **C** to hide the
+   hint. (→ / Space switches to the end card; ← goes back. Start on screen 1.)
+2. **The report** — `report/dist/index.html`, hard-refresh (**Ctrl+Shift+R**).
+   It boots with the **real** StickHub review loaded ("6 Filed").
 3. **Architecture diagram** — `docs/architecture.png`
-4. **Terminal** at the repo root, dark theme, font enlarged (Ctrl+scroll).
+4. **Benchmark chart** — `benchmark/results/comparison_chart.png`
+5. **Terminal** at the repo root, dark theme, font enlarged (Ctrl+scroll), `cls` run.
+   **Confirm no API key is visible in the scrollback.**
 
-Checks: run `cls` first, and **confirm no API key is visible anywhere in the terminal
-scrollback**. Recorder: OBS, or `Win+Alt+R`.
-
-Notes on what you'll see (so nothing surprises you on camera):
-- The **blast-radius graph** drifts for ~2.5 s then **settles completely**. Let it
-  settle before you start narrating that section.
-- The **board overlay** has three annotations: two solid yellow boxes (USB4 area and
-  lower-right), plus a **dashed outline around the whole board** — that's a finding the
-  vision critic applied board-wide. It's drawn unfilled on purpose so it doesn't hide
-  the copper.
+Heads-up so nothing surprises you on camera:
+- The **blast-radius graph** drifts ~2.5 s then settles. Let it settle before narrating.
+- The **board overlay** shows two solid yellow boxes plus a **dashed outline around the
+  whole board** — intentional: that finding applies board-wide, drawn unfilled so it
+  doesn't hide the copper.
 
 ---
 
-## 0:00–0:20 — Hook
+# THE SCRIPT
 
-**Screen:** the board render full-frame (`report/dist/board.png`, or the Board Overlay
-view before you click anything).
+## 1 · 0:00–0:18 — Who + what (title card)
 
-> "Every hardware engineer knows this feeling. You order boards, wait three weeks, and
-> then find out you forgot a decoupling capacitor. A single AI reviewer misses real
-> defects — and invents fake ones. So I didn't build one reviewer. I built a review
-> board."
+**Screen:** `title-card.html`, screen 1, fullscreen. Stay on it the whole time.
 
-## 0:20–0:40 — What it is
+> "Hi, I'm Lluís. For the Qwen Cloud hackathon I built **BoardRoom** — a tool that
+> reviews printed circuit board designs using a team of AI agents that actually argue
+> with each other.
+> Let me show you the problem it solves first."
 
-**Screen:** `docs/architecture.png`.
+*(Don't rush. Let the title breathe for a beat before you switch away.)*
 
-> "BoardRoom is a society of five specialist agents — power integrity, signal integrity,
-> connectivity, DFM and layout, and firmware bring-up — that inspect a real KiCad project
-> through the KiCad MCP server. A Moderator makes them defend their findings with
-> evidence before signing off. Everything runs on Qwen models on Alibaba Cloud Model
-> Studio."
+## 2 · 0:18–0:40 — The problem, then one concrete result
 
-## 0:40–1:05 — It's real (no API needed)
+**Screen:** switch to the report → **Findings Table**. Scroll slowly through the rows.
 
-**Screen:** terminal. Run:
+> "If you send a board to fab with a missing decoupling capacitor or a silkscreen label
+> printed over a pad, you find out three weeks and a few hundred euros later. So I
+> pointed BoardRoom at a real KiCad board — the StickHub USB hub demo — and this is what
+> it came back with. Six findings. Power rails with mixed copper widths. Silkscreen
+> overlapping pads on the USB footprints. Missing fiducials."
 
-```powershell
-.venv\Scripts\python -m pytest -q
-```
+## 3 · 0:40–1:05 — Proof each finding is real, not invented
 
-then:
+**Screen:** expand one row in the Findings Table so its **evidence** block is visible.
+Point at the `evidence_id` and the tool name.
 
-```powershell
-type report\sample\review.sample.json | more
-```
+> "And here's the part I care about most. Every single finding has to cite a real tool
+> call — this ID comes from an actual query against the board file. If an agent makes a
+> claim it can't back with evidence, the finding is rejected automatically before it ever
+> reaches you. Across every benchmark run, both configurations, the hallucination rate
+> was exactly zero."
 
-> "This isn't a mockup. Two hundred and twenty-eight tests, no network required. And this
-> is a real signed review of the KiCad StickHub demo board. Every finding cites a real
-> tool call — if an agent can't cite evidence, the finding is rejected at the schema
-> boundary. Hallucination rate across every run: zero."
+## 4 · 1:05–1:30 — *Now* explain how it works
 
-## 1:05–1:35 — The report (hero shot)
+**Screen:** `docs/architecture.png`. Trace it with the cursor as you talk — left to
+right, one box at a time.
 
-**Screen:** browser. Click **Blast-Radius Graph**, let it settle, hover a node. Then
-click **Board Overlay**.
+> "So how does it work? The board goes in here. Five specialist agents inspect it —
+> power integrity, signal integrity, connectivity, DFM and layout, and firmware bring-up.
+> Each one talks to KiCad through the Model Context Protocol, and each one can only touch
+> the tools in its own lane — that's enforced in code, not by asking the model nicely.
+> They file findings; a Moderator collects them and signs off the review. All of it runs
+> on Qwen models on Alibaba Cloud Model Studio."
 
-> "The output isn't a wall of text. It's a blast-radius map — each finding linked to the
-> nets and components it touches: the five-volt rail, the USB connectors. And the layout
-> critic is a multimodal model that actually sees the board render, so it draws a box
-> around each defect right on the copper."
+## 5 · 1:30–1:55 — The visual payoff
 
-## 1:35–1:55 — The negotiation protocol
+**Screen:** report → **Blast-Radius Graph** (let it settle, hover a node), then
+**Board Overlay**.
 
-> ### ⚠️ HONESTY CONSTRAINT — do not imply this is a live debate.
-> The engine is real and unit-tested, but **no board in the benchmark corpus produced a
-> conflict**, so there is no authentic transcript. Load the clearly-labeled synthetic
-> fixture and say so on camera. The VO below does.
+> "The output isn't a wall of text. It's a map: every finding linked to the nets and
+> components it actually touches — the five-volt rail, the USB connectors. And because
+> the layout critic is a multimodal model, it genuinely looks at the rendered board and
+> draws a box around each defect, right on the copper."
 
-**Screen:** drag `report/sample/review.debate-example.json` onto the dashboard, click
-**Debate Viewer**. Leave the "SYNTHETIC EXAMPLE" title visible.
+## 6 · 1:55–2:15 — The argument (honest disclosure)
 
-> "When two specialists collide — signal integrity wants a wider trace, DFM says that
-> breaks the fab's clearance rule — the Moderator opens a bounded debate: two rounds, one
-> extra measurement per side, then it rules on evidence, not eloquence, and records which
-> measurement decided it. Full disclosure: this transcript is synthetic. The engine is
-> real and tested, but across my whole benchmark corpus the specialists never actually
-> disagreed. That's an honest result about the design, and I'd rather show you the
-> mechanism than fake a fight."
+> ### ⚠️ Do NOT imply this is a live debate.
+> The engine is real and unit-tested, but no board in the corpus produced a conflict, so
+> there is no authentic transcript. Load the labeled synthetic fixture and say so.
 
-## 1:55–2:35 — The numbers
+**Screen:** drag `report/sample/review.debate-example.json` onto the dashboard →
+**Debate Viewer**. Leave the "SYNTHETIC EXAMPLE" label visible.
+
+> "And when two specialists disagree, a Moderator runs a bounded debate — two rounds, one
+> extra measurement each — then rules based on the evidence, not on who argued harder.
+> Full disclosure: this transcript is synthetic. The engine works and is tested, but
+> across my whole benchmark the specialists never actually disagreed. I'd rather show you
+> the mechanism than fake an argument."
+
+## 7 · 2:15–2:45 — Is it actually better? (the numbers)
 
 **Screen:** `benchmark/results/comparison_chart.png`.
 
-> "So is a society better than one big agent? I measured it — six boards, twelve seeded
-> defects, two runs each. Recall is comparable: the society led by one defect out of
-> twelve, which is within noise, and I say so. But look at cost. The society burns two
-> and a half times **more** tokens — and costs nearly three times **less**. Five cheap
-> specialists doing more work beat one expensive generalist doing less. Routing by role
-> beats routing by model size."
+> "Last question: is a team of agents actually better than one big one? I measured it.
+> Six boards, twelve planted defects, two runs each. On finding defects, it's a tie —
+> the team led by one defect out of twelve, which is noise, and I'm not going to claim
+> otherwise. But look at the cost. The team burns two and a half times **more** tokens,
+> and costs nearly three times **less** — because five small models doing more work are
+> far cheaper than one big model doing less. Routing by role beats routing by model size."
 
-## 2:35–3:00 — Close
+## 8 · 2:45–3:00 — Close (end card)
 
-**Screen:** flash `backend/app/qwen_client.py` and `deploy/alibaba/oss_store.py` (~2 s
-each), then the GitHub README.
+**Screen:** press **→** on the title card to reveal the end card.
 
-> "Built entirely on Qwen via Alibaba Cloud Model Studio, with OSS for storage. Open
-> source, MIT. One last honest note: absolute recall is low for both configurations —
-> because most of the defects I seeded are invisible to every tool that exists. No KiCad
-> tool reports that a capacitor is *missing*. The reasoning layer is ahead of the
-> observability layer. That's the most interesting thing I learned. BoardRoom — a society
-> of AI agents that reviews your PCB, and argues about it."
-
-**End card:** repo URL + "Global AI Hackathon Series with Qwen Cloud — Track 3: Agent
-Society".
+> "One honest note to finish: absolute detection rates are low for both setups, because
+> most of the defects I planted are invisible to every tool that exists — no KiCad tool
+> reports that a capacitor is *missing*. The reasoning is ahead of the instruments.
+> That's the most interesting thing I learned building this.
+> BoardRoom. Open source, MIT. Thanks for watching."
 
 ---
 
 ## Timing & delivery
 
-- ~430 words of narration ≈ 3:00 at a normal pace. If you run long, trim 0:40–1:05.
-- Record screen and voice separately if you fumble — far easier than re-shooting.
-- English is fine with an accent; clarity matters more than accent.
+- ~470 words ≈ 3:00 at a natural pace. Running long? Trim section 3 to two sentences.
+- **Record screen and voice separately** if you fumble — far easier than re-shooting.
+- English with an accent is completely fine; clarity beats accent.
+- Cut between windows with Alt+Tab **while silent**, not mid-sentence.
 
 ## Post-record checklist
 

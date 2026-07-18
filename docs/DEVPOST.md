@@ -1,7 +1,7 @@
 # Devpost Submission — BoardRoom
 
 Paste-ready copy for the Devpost form. Benchmark numbers are final (measured, n=2 runs).
-The only thing left to fill is the YouTube URL at the bottom, after recording.
+Video recorded and uploaded. Everything below is ready to submit.
 
 ---
 
@@ -10,8 +10,8 @@ BoardRoom — a society of AI agents that reviews your PCB, and argues about it
 
 ## Elevator pitch (tagline)
 Five specialist Qwen agents review a real KiCad board through the KiCad MCP server,
-file evidence-backed findings, and negotiate conflicts under a Moderator — measurably
-more accurate and cheaper than a single agent.
+file evidence-backed findings, and negotiate conflicts under a Moderator — matching a
+single large-model agent's detection at ~2.9× lower cost, with zero hallucinations.
 
 ## Track
 **Track 3: Agent Society**
@@ -38,7 +38,7 @@ BoardRoom runs a review as a society of agents:
   by role: `qwen3-max` for the Moderator's orchestration and rulings, `qwen-flash` for
   the tool-heavy specialists, `qwen3-vl-plus` for the multimodal layout critic,
   `qwen3-coder-plus` for firmware bring-up artifacts.
-- **KiCad MCP server** (24 typed tool adapters) as the specialists' only path to the
+- **KiCad MCP server** (26 typed tool adapters) as the specialists' only path to the
   board; per-agent tool allowlists enforced in code.
 - **Evidence-first design**: every tool result is cached with a stable evidence ID;
   any finding that doesn't cite real evidence is rejected — an in-architecture
@@ -103,4 +103,4 @@ Model Context Protocol, pydantic, Docker.
 https://github.com/lluisestape-upc/boardroom
 
 ## Video
-⟦YouTube URL⟧
+https://youtu.be/0Sz00T8v508

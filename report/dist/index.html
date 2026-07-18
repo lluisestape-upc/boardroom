@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BoardRoom - PCB Design Review Viewer</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%233b82f6'/%3E%3Ccircle cx='8' cy='8' r='2.2' fill='white'/%3E%3Ccircle cx='16' cy='8' r='2.2' fill='white'/%3E%3Ccircle cx='8' cy='16' r='2.2' fill='white'/%3E%3Ccircle cx='16' cy='16' r='2.2' fill='white'/%3E%3C/svg%3E">
 </head>
 <body class="dark-theme">
   <!-- Sidebar Navigation -->
@@ -311,12 +312,14 @@
         <div class="card stat-card">
           <h3>Estimated Session Cost</h3>
           <div class="stat-value" id="totalCost">$-</div>
-          <p class="stat-help">Based on standard Alibaba Qwen API list pricing.</p>
+          <p class="stat-help">Estimate from placeholder per-token rates &mdash; verify
+            against Model Studio pricing before quoting.</p>
         </div>
         <div class="card stat-card">
           <h3>Society Savings Rate</h3>
-          <div class="stat-value text-green" id="savingsRate">+67.4%</div>
-          <p class="stat-help">vs. single monolithic qwen3-max agent baseline.</p>
+          <div class="stat-value text-green" id="savingsRate">65.7%</div>
+          <p class="stat-help">Measured in the 6-board benchmark ($0.147 vs $0.429 for a
+            single qwen3-max agent) &mdash; not computed from this session.</p>
         </div>
       </div>
       <div class="token-charts-layout">

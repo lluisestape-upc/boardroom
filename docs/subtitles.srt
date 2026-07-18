@@ -1,0 +1,299 @@
+1
+00:00:00,416 --> 00:00:01,701
+Hi, I'm Lluís Estapé
+
+2
+00:00:01,556 --> 00:00:03,448
+and for the Qwen Cloud
+
+3
+00:00:03,448 --> 00:00:05,656
+Hackathon I built BoardRoom, which is a
+
+4
+00:00:05,656 --> 00:00:07,548
+tool that reviews printed circuit board
+
+5
+00:00:07,548 --> 00:00:10,071
+designs using a team of AI agents that
+
+6
+00:00:10,071 --> 00:00:12,594
+actually argue with each other. So let me
+
+7
+00:00:12,594 --> 00:00:14,802
+show you the problem it solves first.
+
+8
+00:00:15,755 --> 00:00:18,665
+If you send a board to fabrication with a
+
+9
+00:00:18,665 --> 00:00:20,604
+missing decoupling capacitor or a
+
+10
+00:00:20,604 --> 00:00:22,867
+silkscreen label printed over a pad, you'll
+
+11
+00:00:22,867 --> 00:00:25,776
+find out three weeks later and a few hundred
+
+12
+00:00:25,776 --> 00:00:28,362
+euros later. So I pointed BoardRoom at a
+
+13
+00:00:28,362 --> 00:00:31,272
+real KiCad board, the StickHub USB demo,
+
+14
+00:00:31,272 --> 00:00:34,181
+and this is what it came up with. Six
+
+15
+00:00:34,181 --> 00:00:36,444
+findings, which are power rails with mixed
+
+16
+00:00:36,444 --> 00:00:37,737
+copper widths, silkscreen overlapping
+
+17
+00:00:37,737 --> 00:00:39,999
+pads on the USB footprints, and missing fiducials.
+
+18
+00:00:42,801 --> 00:00:45,603
+Every single finding has to cite a
+
+19
+00:00:45,603 --> 00:00:48,404
+real tool call. This ID comes from an
+
+20
+00:00:48,404 --> 00:00:51,205
+actual query against the board file. So if
+
+21
+00:00:51,205 --> 00:00:54,006
+an agent makes a claim it can't back
+
+22
+00:00:54,006 --> 00:00:56,107
+with evidence, the finding is rejected
+
+23
+00:00:56,107 --> 00:00:57,858
+automatically before it reaches you.
+
+24
+00:00:57,858 --> 00:00:59,609
+Across every benchmark run, both
+
+25
+00:00:59,609 --> 00:01:01,009
+configurations, the hallucination rate
+
+26
+00:01:01,009 --> 00:01:02,060
+was exactly zero.
+
+27
+00:01:02,700 --> 00:01:05,674
+So how does it work? The board goes
+
+28
+00:01:05,674 --> 00:01:07,905
+in here, five specialists inspect it:
+
+29
+00:01:07,905 --> 00:01:09,392
+power integrity, signal integrity,
+
+30
+00:01:09,392 --> 00:01:11,251
+connectivity, DFM and layout, and firmware
+
+31
+00:01:11,251 --> 00:01:14,225
+bring-up. Each one talks to KiCad through
+
+32
+00:01:14,225 --> 00:01:16,828
+the Model Context Protocol, and each one
+
+33
+00:01:16,828 --> 00:01:19,802
+can only touch the tools in its own
+
+34
+00:01:19,802 --> 00:01:22,033
+lane, and that's enforced in code.
+
+35
+00:01:22,913 --> 00:01:25,149
+They file findings, a Moderator
+
+36
+00:01:25,149 --> 00:01:27,757
+collects them and signs off the review.
+
+37
+00:01:28,357 --> 00:01:31,089
+All of it runs on Qwen models on Alibaba
+
+38
+00:01:31,089 --> 00:01:31,941
+Cloud Model Studio.
+
+39
+00:01:32,331 --> 00:01:35,183
+To have a better understanding of the
+
+40
+00:01:35,183 --> 00:01:38,036
+output, the results are shown in an
+
+41
+00:01:38,036 --> 00:01:40,889
+orbit map where every finding is linked
+
+42
+00:01:40,889 --> 00:01:43,741
+to the nets and components it touches.
+
+43
+00:01:44,902 --> 00:01:47,117
+Because the layout critic is a multimodal
+
+44
+00:01:47,189 --> 00:01:49,476
+model, it looks at the rendered board
+
+45
+00:01:49,476 --> 00:01:52,089
+and draws a box around each defect, right
+
+46
+00:01:52,089 --> 00:01:52,981
+on the copper.
+
+47
+00:01:55,947 --> 00:01:58,721
+I have now dropped an example of a
+
+48
+00:01:58,721 --> 00:02:01,149
+debate to show you the feature between
+
+49
+00:02:01,149 --> 00:02:03,230
+the AI agents. When two specialists
+
+50
+00:02:03,230 --> 00:02:05,311
+disagree, a Moderator runs a bounded
+
+51
+00:02:05,311 --> 00:02:07,391
+debate: two rounds, one extra measurement
+
+52
+00:02:07,391 --> 00:02:09,819
+each, then rules based on the evidence,
+
+53
+00:02:09,819 --> 00:02:12,577
+not on who argued harder. So it's
+
+54
+00:02:12,577 --> 00:02:14,099
+full disclosure, this transcript is
+
+55
+00:02:14,099 --> 00:02:15,924
+synthetic, the engine works and is
+
+56
+00:02:15,924 --> 00:02:17,750
+tested. But across my whole benchmark,
+
+57
+00:02:17,750 --> 00:02:19,272
+the specialists never actually disagreed.
+
+58
+00:02:19,272 --> 00:02:21,706
+So I'd rather show you the mechanism than
+
+59
+00:02:21,706 --> 00:02:22,619
+a fake argument.
+
+60
+00:02:23,447 --> 00:02:25,223
+One last important question is to ask if
+
+61
+00:02:25,223 --> 00:02:26,999
+a team of agents is actually better than
+
+62
+00:02:26,999 --> 00:02:29,743
+one big one. I measured it with six boards,
+
+63
+00:02:29,743 --> 00:02:32,182
+twelve planted defects, two runs each. On
+
+64
+00:02:32,182 --> 00:02:34,605
+finding the defects, it's a tie. The team led
+
+65
+00:02:34,605 --> 00:02:37,296
+by one defect out of twelve, which is noise, so
+
+66
+00:02:37,296 --> 00:02:39,180
+I'm not going to claim otherwise. But
+
+67
+00:02:39,180 --> 00:02:41,334
+looking at the cost, the team burns two
+
+68
+00:02:41,334 --> 00:02:43,218
+and a half times more tokens and costs nearly
+
+69
+00:02:43,218 --> 00:02:44,833
+three times less, because five small
+
+70
+00:02:44,833 --> 00:02:46,717
+models doing more work are far cheaper
+
+71
+00:02:46,717 --> 00:02:48,870
+than one big model doing less. So routing
+
+72
+00:02:48,870 --> 00:02:50,754
+by role beats routing by model size.
+
+73
+00:02:51,023 --> 00:02:53,391
+Thank you for watching and I hope you
+
+74
+00:02:53,391 --> 00:02:55,463
+find my project useful. Special thanks to
+
+75
+00:02:55,463 --> 00:02:57,239
+Qwen AI for creating this hackathon.
