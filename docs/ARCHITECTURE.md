@@ -6,13 +6,18 @@ schemas/finding.schema.json for the finding contract.
 
 ## System diagram
 
+![BoardRoom architecture](architecture.png)
+
+<details>
+<summary>Mermaid source (same diagram)</summary>
+
 ```mermaid
 flowchart TB
     subgraph client["Client"]
-        UI["report/ — interactive review UI<br/>(blast-radius graph, debate viewer)<br/>[Antigravity workstream]"]
+        UI["report/ — interactive review UI<br/>blast-radius graph, board overlay,<br/>debate viewer, token panel"]
     end
 
-    subgraph alicloud["Alibaba Cloud (ECS / Function Compute)"]
+    subgraph alicloud["Alibaba Cloud"]
         subgraph backend["backend/ — FastAPI orchestrator"]
             MOD["Moderator / Chair<br/>qwen3-max<br/>assign → collect → negotiate → rule"]
             QC["qwen_client.py<br/>model routing + per-agent token accounting"]
@@ -42,16 +47,18 @@ flowchart TB
     KICAD[".kicad_pro / .kicad_sch / .kicad_pcb"]
 
     KICAD --> OSS --> backend
-    MOD -->|scoped tasks| society
-    society -->|findings (schema-validated)| MOD
+    MOD -->|"scoped tasks"| society
+    society -->|"findings, schema-validated"| MOD
     society --> REG --> KMCP
-    KMCP --> CACHE -->|evidence ids| society
+    KMCP --> CACHE -->|"evidence ids"| society
     REND --> DFM
     QC <--> MS
     MOD --> QC
     society --> QC
-    MOD -->|signed review.json| SESS --> UI
+    MOD -->|"signed review.json"| SESS --> UI
 ```
+
+</details>
 
 ## Review session lifecycle
 
@@ -66,7 +73,7 @@ flowchart TB
    one extra tool call per side per round → evidence-cited rulings.
 5. **Sign-off** — `review.json`: upheld/merged findings, rulings with rationale,
    per-agent token accounting, coverage notes.
-6. **Report** — the Antigravity-built frontend renders the blast-radius graph
+6. **Report** — the `report/` frontend renders the blast-radius graph
    (findings → nets → components), board-image overlays from `board_region`, and the
    debate transcripts.
 
@@ -90,13 +97,16 @@ BoardRoom/
 ├── LICENSE                    # MIT (must be visible in GitHub About)
 ├── README.md
 ├── TASKS.md                   # task board (workstreams, owners, status)
-├── ANTIGRAVITY_BRIEF.md       # frozen brief for the report/ workstream
-├── .claude/agents/            # the engineering team (8 subagents)
+├── ANTIGRAVITY_BRIEF.md       # frontend spec for report/ (contract frozen)
+├── .claude/agents/            # the engineering team (9 subagents)
 ├── backend/
 │   ├── requirements.txt
 │   └── app/
 │       ├── main.py            # FastAPI: sessions, review endpoints, health
+│       ├── review.py          # CLI: run a full live review over a project
+│       ├── runner.py          # tool-calling specialist loop + manifest builder
 │       ├── moderator.py       # assignment, conflict detection, debate, ruling
+│       ├── interfaces.py      # Protocol contracts between workstreams
 │       ├── qwen_client.py     # model routing, token accounting (ALL calls)
 │       └── sessions.py        # session state machine + JSON persistence
 ├── society/
@@ -112,8 +122,9 @@ BoardRoom/
 │   ├── corpus/                # fetch scripts + defect-seed patches + ground truth
 │   ├── seed.py                # reproducible defect injection
 │   ├── run.py                 # python -m benchmark.run --config society|baseline
-│   └── metrics.py             # recall, FP, hallucination rate, tokens, wall time
-├── report/                    # ⚠ ANTIGRAVITY WORKSTREAM — do not edit here
+│   ├── _execute.py            # the single runner seam (mock | real)
+│   └── metrics.py             # recall, unmatched, hallucination rate, tokens
+├── report/                    # offline review viewer (owned by frontend-engineer)
 ├── deploy/
 │   ├── Dockerfile             # python 3.11 + KiCad + backend
 │   ├── alibaba/               # OSS integration (linkable deployment proof)
@@ -121,6 +132,8 @@ BoardRoom/
 │   └── smoke.sh               # e2e smoke against deployed instance
 ├── docs/
 │   ├── ARCHITECTURE.md        # this file
+│   ├── architecture.png       # rendered diagram (judges may not render mermaid)
+│   ├── BENCHMARK.md           # method, results, limitations
 │   ├── NEGOTIATION_PROTOCOL.md
 │   ├── schemas/finding.schema.json   # FROZEN v1
 │   ├── VIDEO_SCRIPT.md
@@ -135,7 +148,7 @@ BoardRoom/
 |---|---|
 | Public OSS repo, license visible | LICENSE + GitHub About setting |
 | Alibaba Cloud deployment proof (code file) | deploy/alibaba/*, backend/app/qwen_client.py |
-| Architecture diagram | this file (mermaid) + exported PNG in docs/ |
+| Architecture diagram | docs/architecture.png + mermaid source in this file |
 | ~3 min public video | docs/VIDEO_SCRIPT.md → YouTube |
 | Track identification | Track 3 — Agent Society (docs/DEVPOST.md) |
-| Measurable gain vs single agent | benchmark/ results table in README |
+| Measurable gain vs single agent | docs/BENCHMARK.md + README results table |

@@ -403,30 +403,51 @@
     startGraphPhysics();
   }
 
+  // Simulated-annealing "temperature". Starts hot, cools to rest so the layout
+  // SETTLES instead of jittering forever (a permanently vibrating graph is
+  // unreadable — and unusable as a demo visual). Dragging re-heats it.
+  let graphAlpha = 1;
+  const ALPHA_DECAY = 0.035;   // how fast it cools (~2.5s to rest at 60fps)
+  const ALPHA_MIN = 0.004;     // below this we consider it at rest
+
+  function reheatGraph(amount = 0.45) {
+    graphAlpha = Math.max(graphAlpha, amount);
+  }
+
   function startGraphPhysics() {
     cancelAnimationFrame(animationFrameId);
+    graphAlpha = 1; // fresh layout starts hot
 
     function tick() {
       if (activeView !== 'blast-radius') return;
-      updatePhysics();
+      // Once settled we stop integrating but keep drawing, so hover/selection
+      // highlights still respond while the layout stays perfectly still.
+      if (graphAlpha > ALPHA_MIN) {
+        updatePhysics();
+        graphAlpha -= graphAlpha * ALPHA_DECAY;
+      }
       drawGraph();
       animationFrameId = requestAnimationFrame(tick);
     }
-    
+
     animationFrameId = requestAnimationFrame(tick);
   }
 
   // Core Force-Directed Layout Physics
   function updatePhysics() {
-    const kRepulsion = 1200;  // Force pushing nodes apart
-    const kAttraction = 0.06;  // Force pulling connected nodes together
-    const kGravity = 0.025;   // Gravity pulling towards center
-    const friction = 0.85;
+    const kRepulsion = 5200;   // stronger, so nodes spread instead of clumping
+    const kAttraction = 0.035; // gentler springs -> longer, readable edges
+    const kGravity = 0.012;    // softer pull to center (less oscillation)
+    const friction = 0.78;     // more damping -> calmer motion
+    const LABEL_PAD = 26;      // extra separation so text labels don't overlap
+    const MAX_SPEED = 12;      // clamp: prevents the "explosive" jitter
 
     const centerX = graphCanvas.width / 2;
     const centerY = graphCanvas.height / 2;
 
-    // 1. Center Gravity & Initialize forces
+    if (graphDragNode) reheatGraph(0.3);
+
+    // 1. Center Gravity
     graphNodes.forEach(node => {
       if (node === graphDragNode) return;
       node.vx += (centerX - node.x) * kGravity;
@@ -438,23 +459,20 @@
       const n1 = graphNodes[i];
       for (let j = i + 1; j < graphNodes.length; j++) {
         const n2 = graphNodes[j];
-        const dx = n2.x - n1.x || 1.0;
-        const dy = n2.y - n1.y || 0.0;
-        const dist = Math.hypot(dx, dy) || 1.0;
-
-        // Repel force inversely proportional to distance
-        const force = kRepulsion / (dist * dist);
+        let dx = n2.x - n1.x;
+        let dy = n2.y - n1.y;
+        let dist = Math.hypot(dx, dy);
+        if (dist < 0.01) { // identical positions: nudge deterministically
+          dx = (i - j) || 1; dy = 1; dist = Math.hypot(dx, dy);
+        }
+        // Clamp the effective distance so the 1/d^2 term can't explode.
+        const eff = Math.max(dist, 24);
+        const force = kRepulsion / (eff * eff);
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
 
-        if (n1 !== graphDragNode) {
-          n1.vx -= fx;
-          n1.vy -= fy;
-        }
-        if (n2 !== graphDragNode) {
-          n2.vx += fx;
-          n2.vy += fy;
-        }
+        if (n1 !== graphDragNode) { n1.vx -= fx; n1.vy -= fy; }
+        if (n2 !== graphDragNode) { n2.vx += fx; n2.vy += fy; }
       }
     }
 
@@ -466,33 +484,52 @@
       const dy = n2.y - n1.y;
       const dist = Math.hypot(dx, dy) || 1.0;
 
-      // Attract force proportional to distance
       const force = dist * kAttraction;
       const fx = (dx / dist) * force;
       const fy = (dy / dist) * force;
 
-      if (n1 !== graphDragNode) {
-        n1.vx += fx;
-        n1.vy += fy;
-      }
-      if (n2 !== graphDragNode) {
-        n2.vx -= fx;
-        n2.vy -= fy;
-      }
+      if (n1 !== graphDragNode) { n1.vx += fx; n1.vy += fy; }
+      if (n2 !== graphDragNode) { n2.vx -= fx; n2.vy -= fy; }
     });
 
-    // 4. Update Positions
+    // 4. Update positions — displacement scaled by the cooling temperature.
     graphNodes.forEach(node => {
       if (node === graphDragNode) return;
-      node.x += node.vx;
-      node.y += node.vy;
       node.vx *= friction;
       node.vy *= friction;
 
-      // Keep inside bounds roughly
+      // Clamp speed, then scale by alpha so motion fades to a standstill.
+      const speed = Math.hypot(node.vx, node.vy);
+      if (speed > MAX_SPEED) {
+        node.vx = (node.vx / speed) * MAX_SPEED;
+        node.vy = (node.vy / speed) * MAX_SPEED;
+      }
+      node.x += node.vx * graphAlpha;
+      node.y += node.vy * graphAlpha;
+
       node.x = Math.max(50, Math.min(graphCanvas.width - 50, node.x));
       node.y = Math.max(50, Math.min(graphCanvas.height - 50, node.y));
     });
+
+    // 5. Hard collision separation — guarantees labels never sit on top of each
+    // other, which pure force-based repulsion does not.
+    for (let pass = 0; pass < 2; pass++) {
+      for (let i = 0; i < graphNodes.length; i++) {
+        const n1 = graphNodes[i];
+        for (let j = i + 1; j < graphNodes.length; j++) {
+          const n2 = graphNodes[j];
+          const dx = n2.x - n1.x;
+          const dy = n2.y - n1.y;
+          const dist = Math.hypot(dx, dy) || 0.01;
+          const minDist = n1.radius + n2.radius + LABEL_PAD;
+          if (dist >= minDist) continue;
+          const push = (minDist - dist) / 2;
+          const ux = dx / dist, uy = dy / dist;
+          if (n1 !== graphDragNode) { n1.x -= ux * push; n1.y -= uy * push; }
+          if (n2 !== graphDragNode) { n2.x += ux * push; n2.y += uy * push; }
+        }
+      }
+    }
   }
 
   // Draw Graph onto Canvas with Rich Dark Glow Aesthetics

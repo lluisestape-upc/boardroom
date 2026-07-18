@@ -46,6 +46,11 @@ MAX_EDGE_PX = 2000
 #: Shortest allowed longest-edge; tiny boards are scaled up to stay legible.
 MIN_EDGE_PX = 320
 
+#: Minimum for the SHORT edge. Narrow boards otherwise render too coarse for the
+#: qwen3-vl layout critic (and for the board-overlay view) even when their long
+#: edge is comfortably above MIN_EDGE_PX.
+MIN_SHORT_EDGE_PX = 700
+
 #: Used when the Edge.Cuts bounding box cannot be determined from the file.
 FALLBACK_SIZE_PX = (1600, 1200)
 
@@ -179,9 +184,18 @@ def planned_render_size(pcb_text: str) -> tuple[int, int, float]:
     width = width_mm / MM_PER_INCH * RENDER_DPI
     height = height_mm / MM_PER_INCH * RENDER_DPI
     longest = max(width, height)
+    shortest = min(width, height)
     scale = 1.0
     if longest > MAX_EDGE_PX:
         scale = MAX_EDGE_PX / longest
+    elif shortest < MIN_SHORT_EDGE_PX:
+        # A long, narrow board (e.g. a USB stick) can clear the long-edge minimum
+        # while its short edge is only ~150 px — far too coarse for the vision
+        # critic to see silkscreen or pad detail. Scale up on the SHORT edge,
+        # then back off if that would blow past the long-edge ceiling.
+        scale = MIN_SHORT_EDGE_PX / shortest
+        if longest * scale > MAX_EDGE_PX:
+            scale = MAX_EDGE_PX / longest
     elif longest < MIN_EDGE_PX:
         scale = MIN_EDGE_PX / longest
     return (

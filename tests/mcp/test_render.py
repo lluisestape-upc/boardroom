@@ -14,6 +14,7 @@ from mcp.render import (
     FALLBACK_SIZE_PX,
     MAX_EDGE_PX,
     MIN_EDGE_PX,
+    MIN_SHORT_EDGE_PX,
     RENDER_DPI,
     RenderResult,
     edge_cuts_bbox_mm,
@@ -109,9 +110,29 @@ def test_planned_size_clamps_large_board_and_scales_dpi():
 
 
 def test_planned_size_scales_up_tiny_board():
+    # Scaling is driven by the SHORT edge so narrow boards stay legible.
     w, h, dpi = planned_render_size(board_text(10, 5))
-    assert max(w, h) == MIN_EDGE_PX
-    assert dpi > RENDER_DPI
+    assert min(w, h) == MIN_SHORT_EDGE_PX
+    assert max(w, h) <= MAX_EDGE_PX
+    assert dpi > RENDER_DPI  # upscaling raises effective dpi
+
+
+def test_planned_size_scales_up_long_narrow_board():
+    """A USB-stick-shaped board clears the long-edge minimum while its short edge
+    is far too coarse for the vision critic — the regression this guards."""
+    w, h, dpi = planned_render_size(board_text(14, 38))  # ~StickHub proportions
+    assert min(w, h) >= MIN_SHORT_EDGE_PX
+    assert max(w, h) <= MAX_EDGE_PX
+    # metadata stays self-consistent: px / dpi * 25.4 ≈ mm
+    assert min(w, h) / dpi * 25.4 == pytest.approx(14, rel=0.01)
+
+
+def test_planned_size_short_edge_boost_never_exceeds_max_edge():
+    # An extremely elongated board must respect the long-edge ceiling even though
+    # that leaves the short edge below MIN_SHORT_EDGE_PX.
+    w, h, dpi = planned_render_size(board_text(5, 400))
+    assert max(w, h) == MAX_EDGE_PX
+    assert min(w, h) < MIN_SHORT_EDGE_PX
 
 
 def test_planned_size_fallback_without_outline():
@@ -172,9 +193,12 @@ def test_render_success(pcb_file, tmp_path, monkeypatch):
     result = render_board(pcb_file, tmp_path / "out", kicad_cli="kicad-cli-fake")
 
     assert isinstance(result, RenderResult)
-    assert result.dpi == RENDER_DPI
-    assert result.width_px == round(100 / 25.4 * RENDER_DPI)
-    assert result.height_px == round(50 / 25.4 * RENDER_DPI)
+    # 100x50 mm: the 50 mm short edge is boosted to MIN_SHORT_EDGE_PX, so the
+    # effective dpi rises above the nominal RENDER_DPI. Metadata must stay
+    # consistent with the actual pixel dimensions.
+    assert result.dpi > RENDER_DPI
+    assert min(result.width_px, result.height_px) == MIN_SHORT_EDGE_PX
+    assert result.width_px / result.dpi * 25.4 == pytest.approx(100, rel=0.01)
     assert Path(result.image_path).name == "demo_top.png"
     assert "--side" in captured["cmd"] and "top" in captured["cmd"]
 
@@ -211,5 +235,10 @@ def test_live_render_stickhub(tmp_path):
     result = render_board(STICKHUB, tmp_path)
     assert Path(result.image_path).is_file()
     assert (result.width_px, result.height_px) == png_dimensions(result.image_path)
-    assert 0 < result.dpi <= RENDER_DPI + 1e-6
+    assert result.dpi > 0
     assert max(result.width_px, result.height_px) <= MAX_EDGE_PX
+    # StickHub is long and narrow: the short edge must have been boosted so the
+    # vision critic can actually resolve silkscreen and pads. kicad-cli fits the
+    # board into the requested box preserving aspect ratio, so the delivered
+    # short edge can land slightly under what we asked for (700 -> 672).
+    assert min(result.width_px, result.height_px) >= MIN_SHORT_EDGE_PX * 0.9

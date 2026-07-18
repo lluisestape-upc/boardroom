@@ -64,8 +64,8 @@
       "board_region": {
         "x": 0,
         "y": 0,
-        "w": 168,
-        "h": 448,
+        "w": 672,
+        "h": 1680,
         "image": "StickHub_top.png"
       },
       "affected_components": [
@@ -117,10 +117,10 @@
         }
       ],
       "board_region": {
-        "x": 120,
-        "y": 320,
-        "w": 48,
-        "h": 24,
+        "x": 480,
+        "y": 1200,
+        "w": 192,
+        "h": 90,
         "image": "StickHub_top.png"
       },
       "affected_components": [
@@ -148,10 +148,10 @@
         }
       ],
       "board_region": {
-        "x": 80,
-        "y": 20,
-        "w": 88,
-        "h": 40,
+        "x": 320,
+        "y": 75,
+        "w": 352,
+        "h": 150,
         "image": "StickHub_top.png"
       },
       "affected_components": [
@@ -199,9 +199,9 @@
   "signed_at": "2026-07-16T15:17:53.717581+00:00",
   "render": {
     "image": "StickHub_top.png",
-    "width_px": 168,
-    "height_px": 448,
-    "dpi": 300.0
+    "width_px": 672,
+    "height_px": 1680,
+    "dpi": 1077.58
   },
   "project_name": "StickHub USB Hub (KiCad demo) \u2014 live BoardRoom review"
 }
