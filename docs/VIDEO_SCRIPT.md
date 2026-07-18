@@ -1,114 +1,146 @@
 # BoardRoom — 3-Minute Demo Video Script
 
-Target: ~3:00, public on YouTube. Dark theme everywhere (terminal + report UI).
-Record at 1920×1080. Placeholders in ⟦brackets⟧ get filled from the real review +
-benchmark before recording.
+Target ~3:00, uploaded **public** to YouTube. Record 1920×1080, dark theme.
 
-Tools to have open before recording:
-- Terminal (dark) at the repo root, venv active, `DASHSCOPE_API_KEY` set.
-- Browser with `report/dist/index.html` loaded showing the **real** StickHub review.
-- The architecture diagram (docs/ARCHITECTURE.md rendered) in a tab.
-- `docs/BENCHMARK.md` results table + the comparison chart PNG in a tab.
-
-Record the terminal actions once as a clean take; do voiceover separately and lay it
-over the screen capture so the pacing is tight.
+> ## ⚠️ DO NOT RUN A LIVE REVIEW WHILE RECORDING
+> The Model Studio free quota is spent. Every artifact you need is already saved in
+> the repo — this script films **real saved results**, never a live API call. The two
+> terminal commands below (`pytest`, printing a saved review) make **zero** network
+> calls.
 
 ---
 
-## 0:00–0:20 — Hook (the problem)
+## Before you hit record (10 min)
 
-**On screen:** the StickHub board render (`fixtures/stickhub` top view), zoom on a
-region with a seeded/real defect.
+Open these four things:
 
-**VO:** "Every hardware engineer knows this fear: you send a PCB to fab, and a
-decoupling cap you forgot, or an I²C bus with no pull-ups, costs you a three-week
-respin. A single AI reviewer misses things and hallucinates others. So we didn't
-build one reviewer — we built a *review board*."
+1. **The report** — double-click
+   `report/dist/index.html`
+   It boots with the **real** StickHub review already loaded (shows "6 Filed").
+   Hard-refresh once (**Ctrl+Shift+R**) so you get the latest build.
+2. **Benchmark chart** — `benchmark/results/comparison_chart.png`
+3. **Architecture diagram** — `docs/architecture.png`
+4. **Terminal** at the repo root, dark theme, font enlarged (Ctrl+scroll).
 
-## 0:20–0:35 — What it is (one sentence + diagram)
+Checks: run `cls` first, and **confirm no API key is visible anywhere in the terminal
+scrollback**. Recorder: OBS, or `Win+Alt+R`.
 
-**On screen:** the architecture diagram — KiCad project → MCP tool layer → five
-specialists → Moderator → signed review.
+Notes on what you'll see (so nothing surprises you on camera):
+- The **blast-radius graph** drifts for ~2.5 s then **settles completely**. Let it
+  settle before you start narrating that section.
+- The **board overlay** has three annotations: two solid yellow boxes (USB4 area and
+  lower-right), plus a **dashed outline around the whole board** — that's a finding the
+  vision critic applied board-wide. It's drawn unfilled on purpose so it doesn't hide
+  the copper.
 
-**VO:** "BoardRoom is a society of five specialist agents — power integrity, signal
-integrity, connectivity, DFM, and firmware bring-up — that inspect a real KiCad
-project through the KiCad MCP server, and a Moderator that makes them defend their
-findings with evidence before signing off."
+---
 
-## 0:35–1:10 — The society working live (the technical spine)
+## 0:00–0:20 — Hook
 
-**On screen:** terminal. Run the review against StickHub:
+**Screen:** the board render full-frame (`report/dist/board.png`, or the Board Overlay
+view before you click anything).
+
+> "Every hardware engineer knows this feeling. You order boards, wait three weeks, and
+> then find out you forgot a decoupling capacitor. A single AI reviewer misses real
+> defects — and invents fake ones. So I didn't build one reviewer. I built a review
+> board."
+
+## 0:20–0:40 — What it is
+
+**Screen:** `docs/architecture.png`.
+
+> "BoardRoom is a society of five specialist agents — power integrity, signal integrity,
+> connectivity, DFM and layout, and firmware bring-up — that inspect a real KiCad project
+> through the KiCad MCP server. A Moderator makes them defend their findings with
+> evidence before signing off. Everything runs on Qwen models on Alibaba Cloud Model
+> Studio."
+
+## 0:40–1:05 — It's real (no API needed)
+
+**Screen:** terminal. Run:
+
+```powershell
+.venv\Scripts\python -m pytest -q
 ```
-python -m boardroom.review fixtures/stickhub   ⟦exact command from runner⟧
+
+then:
+
+```powershell
+type report\sample\review.sample.json | more
 ```
-Show the specialists dispatching concurrently, each logging the KiCad tools it calls
-(run_erc, extract_power_domains, render_board…) and the evidence IDs it gets back.
 
-**VO:** "Each specialist runs on a cheap, fast Qwen model and can only touch the
-tools in its lane — enforced in code, not by prompting. Every tool result becomes a
-cited piece of evidence. A finding with no evidence is rejected automatically — that's
-how we keep hallucinations out." ⟦state real accepted/rejected count⟧
+> "This isn't a mockup. Two hundred and twenty-eight tests, no network required. And this
+> is a real signed review of the KiCad StickHub demo board. Every finding cites a real
+> tool call — if an agent can't cite evidence, the finding is rejected at the schema
+> boundary. Hallucination rate across every run: zero."
 
-## 1:10–1:50 — The negotiation protocol
+## 1:05–1:35 — The report (hero shot)
 
-> ⚠️ **HONESTY CONSTRAINT — read before recording.** The negotiation engine is real,
-> bounded and unit-tested (13 tests), but **no board in our benchmark corpus produced a
-> conflicting pair of findings**, so we have NO real debate transcript. Do **not** imply
-> this footage is a live debate. Load `report/sample/review.debate-example.json` (clearly
-> labeled synthetic) to show the viewer, and say so out loud — the VO below does.
+**Screen:** browser. Click **Blast-Radius Graph**, let it settle, hover a node. Then
+click **Board Overlay**.
 
-**On screen:** the report UI **Debate viewer** loaded with the synthetic example — the
-title bar reads "SYNTHETIC EXAMPLE", leave it visible. Show the two rounds, the extra
-evidence each side pulls, the Moderator's ruling with cited evidence highlighted.
+> "The output isn't a wall of text. It's a blast-radius map — each finding linked to the
+> nets and components it touches: the five-volt rail, the USB connectors. And the layout
+> critic is a multimodal model that actually sees the board render, so it draws a box
+> around each defect right on the copper."
 
-**VO:** "When two specialists collide — Signal Integrity wants a wider trace, DFM says
-that breaks the fab's clearance rule — the Moderator opens a bounded debate: two rounds,
-one extra measurement per side, then it rules on *evidence*, not eloquence, and records
-which measurement decided it. Full disclosure: this transcript is synthetic. The engine
-is real and tested, but across our whole benchmark corpus the specialists never actually
-disagreed — their scopes are narrow enough that conflicts are rare. That's an honest
-result about the design, and we'd rather show you the mechanism than fake a fight."
+## 1:35–1:55 — The negotiation protocol
 
-## 1:50–2:20 — The blast-radius report
+> ### ⚠️ HONESTY CONSTRAINT — do not imply this is a live debate.
+> The engine is real and unit-tested, but **no board in the benchmark corpus produced a
+> conflict**, so there is no authentic transcript. Load the clearly-labeled synthetic
+> fixture and say so on camera. The VO below does.
 
-**On screen:** the report UI **blast-radius graph** — findings → nets → components,
-colored by severity — then the board overlay with bounding boxes from the VL layout
-critic.
+**Screen:** drag `report/sample/review.debate-example.json` onto the dashboard, click
+**Debate Viewer**. Leave the "SYNTHETIC EXAMPLE" title visible.
 
-**VO:** "The output isn't a wall of text. It's a blast-radius map: every finding
-linked to the nets and parts it touches, and the layout critic — a multimodal Qwen
-model that actually *sees* the board render — boxes each defect right on the copper."
+> "When two specialists collide — signal integrity wants a wider trace, DFM says that
+> breaks the fab's clearance rule — the Moderator opens a bounded debate: two rounds, one
+> extra measurement per side, then it rules on evidence, not eloquence, and records which
+> measurement decided it. Full disclosure: this transcript is synthetic. The engine is
+> real and tested, but across my whole benchmark corpus the specialists never actually
+> disagreed. That's an honest result about the design, and I'd rather show you the
+> mechanism than fake a fight."
 
-## 2:20–2:45 — The benchmark (the proof)
+## 1:55–2:35 — The numbers
 
-**On screen:** the comparison chart — society vs. single-agent baseline.
+**Screen:** `benchmark/results/comparison_chart.png`.
 
-**VO:** "So is a society actually better than one big agent? We measured it — two runs
-each, same boards, same seeded defects. Here's the honest answer. Recall is comparable:
-the society edged it by one defect out of twelve, which is within noise. But look at
-cost. The society burns two and a half times MORE tokens — and costs nearly three times
-LESS. Five cheap specialists doing more work beat one expensive generalist doing less.
-And both hallucinated exactly zero times, because a finding without cited evidence
-can't be filed at all."
+> "So is a society better than one big agent? I measured it — six boards, twelve seeded
+> defects, two runs each. Recall is comparable: the society led by one defect out of
+> twelve, which is within noise, and I say so. But look at cost. The society burns two
+> and a half times **more** tokens — and costs nearly three times **less**. Five cheap
+> specialists doing more work beat one expensive generalist doing less. Routing by role
+> beats routing by model size."
 
-## 2:45–3:00 — Close (Alibaba Cloud + wrap)
+## 2:35–3:00 — Close
 
-**On screen:** quick cut — `qwen_client.py` (Model Studio endpoint) and
-`deploy/alibaba/oss_store.py`, then the repo's README hero.
+**Screen:** flash `backend/app/qwen_client.py` and `deploy/alibaba/oss_store.py` (~2 s
+each), then the GitHub README.
 
-**VO:** "Built entirely on Qwen models on Alibaba Cloud Model Studio, open source,
-Track 3. BoardRoom — a society of AI agents that reviews your PCB, and argues about
-it."
+> "Built entirely on Qwen via Alibaba Cloud Model Studio, with OSS for storage. Open
+> source, MIT. One last honest note: absolute recall is low for both configurations —
+> because most of the defects I seeded are invisible to every tool that exists. No KiCad
+> tool reports that a capacitor is *missing*. The reasoning layer is ahead of the
+> observability layer. That's the most interesting thing I learned. BoardRoom — a society
+> of AI agents that reviews your PCB, and argues about it."
 
 **End card:** repo URL + "Global AI Hackathon Series with Qwen Cloud — Track 3: Agent
 Society".
 
 ---
 
-### Recording checklist
-- [ ] Real StickHub review produces a contested finding with a full debate (if the
-      real board doesn't naturally conflict, run against `cm5_minima` which seeds all
-      5 defect types, or use a seeded StickHub copy — say so honestly in the VO).
-- [ ] Numbers in 2:20–2:45 match `docs/BENCHMARK.md` exactly.
-- [ ] No API key visible on screen at any point (check the terminal scrollback).
-- [ ] Video is public, not unlisted.
+## Timing & delivery
+
+- ~430 words of narration ≈ 3:00 at a normal pace. If you run long, trim 0:40–1:05.
+- Record screen and voice separately if you fumble — far easier than re-shooting.
+- English is fine with an accent; clarity matters more than accent.
+
+## Post-record checklist
+
+- [ ] Video is **public** on YouTube (not unlisted — the rules require public).
+- [ ] Paste the URL into `docs/DEVPOST.md` (bottom) and the Devpost form.
+- [ ] No API key visible in any frame.
+- [ ] Devpost: repo URL + video URL + **Track 3** + description from `docs/DEVPOST.md`.
+- [ ] GitHub **About**: description set and **License: MIT** visible.
+- [ ] Optional: publish `docs/BLOG_DRAFT.md` and add its URL for the Blog Post Award.

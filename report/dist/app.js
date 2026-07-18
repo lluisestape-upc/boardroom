@@ -1027,21 +1027,42 @@
       else if (f.severity === 'minor') { color = 'rgba(234, 179, 8, 0.4)'; strokeColor = '#eab308'; }
 
       ctx.save();
-      
-      // Bounding Box background fill
-      ctx.fillStyle = isHovered ? color.replace('0.4', '0.25').replace('0.5', '0.35') : color.replace('0.4', '0.1').replace('0.5', '0.15');
-      ctx.fillRect(box.x, box.y, box.w, box.h);
+
+      // A "whole board" region (the vision critic sometimes boxes the entire
+      // image for issues spread across many footprints) carries no positional
+      // information, and filling it just tints the whole render and hides the
+      // copper. Outline it dashed instead of filling — the finding is kept
+      // exactly as filed, only its presentation changes.
+      const coversBoard =
+        (box.w * box.h) / (boardCanvas.width * boardCanvas.height) > 0.8;
+
+      if (!coversBoard) {
+        ctx.fillStyle = isHovered
+          ? color.replace('0.4', '0.25').replace('0.5', '0.35')
+          : color.replace('0.4', '0.1').replace('0.5', '0.15');
+        ctx.fillRect(box.x, box.y, box.w, box.h);
+      }
 
       // Bounding Box Borders
       ctx.strokeStyle = strokeColor;
       ctx.lineWidth = isSelected ? 4 : (isHovered ? 3 : 2);
-      
+      if (coversBoard) {
+        ctx.setLineDash([12, 8]);
+        ctx.globalAlpha = isHovered || isSelected ? 0.9 : 0.45;
+      }
+
       // Draw neon glow for active elements
       if (isHovered || isSelected) {
         ctx.shadowBlur = 10;
         ctx.shadowColor = strokeColor;
       }
-      ctx.strokeRect(box.x, box.y, box.w, box.h);
+      // Inset a whole-board outline so it isn't clipped at the canvas edge.
+      if (coversBoard) {
+        const i = Math.max(2, ctx.lineWidth);
+        ctx.strokeRect(box.x + i, box.y + i, box.w - i * 2, box.h - i * 2);
+      } else {
+        ctx.strokeRect(box.x, box.y, box.w, box.h);
+      }
       ctx.restore();
 
       // Bounding box label
