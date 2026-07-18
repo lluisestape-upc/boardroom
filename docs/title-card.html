@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BoardRoom — title card</title>
+<style>
+  :root{
+    --bg:#060913; --blue:#3b82f6; --blue-lt:#60a5fa; --green:#22c55e;
+    --text:#f1f5f9; --muted:#94a3b8; --dim:#64748b;
+    --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+            "Helvetica Neue", Arial, sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--text); font-family:var(--font);
+    display:grid; place-items:center; overflow:hidden; cursor:none;
+  }
+  /* subtle PCB-ish grid, same language as the report's graph background */
+  body::before{
+    content:""; position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(59,130,246,.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,.055) 1px, transparent 1px);
+    background-size:56px 56px;
+    mask-image:radial-gradient(ellipse 75% 65% at 50% 45%, #000 55%, transparent 100%);
+    -webkit-mask-image:radial-gradient(ellipse 75% 65% at 50% 45%, #000 55%, transparent 100%);
+  }
+  body::after{ /* soft blue glow behind the title */
+    content:""; position:fixed; left:50%; top:44%; width:1100px; height:1100px;
+    transform:translate(-50%,-50%);
+    background:radial-gradient(circle, rgba(59,130,246,.13) 0%, transparent 62%);
+    pointer-events:none;
+  }
+  .card{position:relative; z-index:1; text-align:center; padding:0 6vw; max-width:1500px}
+  .screen{display:none}
+  .screen.active{display:block; animation:in .7s ease both}
+  @keyframes in{from{opacity:0; transform:translateY(14px)}to{opacity:1;transform:none}}
+
+  .badges{display:flex; gap:.7rem; justify-content:center; margin-bottom:2.6rem;
+          flex-wrap:wrap}
+  .badge{
+    font-size:clamp(.72rem,1.15vw,1rem); font-weight:600; letter-spacing:.09em;
+    text-transform:uppercase; padding:.5rem 1.05rem; border-radius:999px;
+    border:1px solid rgba(148,163,184,.28); color:var(--muted);
+  }
+  .badge.track{color:var(--green); border-color:rgba(34,197,94,.45);
+               background:rgba(34,197,94,.08)}
+
+  .logo{
+    width:clamp(64px,6.4vw,92px); height:clamp(64px,6.4vw,92px);
+    border-radius:22%; margin:0 auto 1.9rem;
+    background:linear-gradient(145deg,#1d4ed8,#3b82f6);
+    box-shadow:0 12px 44px rgba(59,130,246,.42);
+    display:grid; place-items:center;
+  }
+  .logo svg{width:56%; height:56%}
+
+  h1{
+    font-size:clamp(3.6rem,10.5vw,9.5rem); font-weight:800; letter-spacing:-.035em;
+    line-height:.95;
+    background:linear-gradient(180deg,#fff 30%,#9dc1fb 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .rule{
+    width:clamp(90px,11vw,190px); height:3px; margin:2.1rem auto;
+    background:linear-gradient(90deg,transparent,var(--blue),transparent);
+    border-radius:3px;
+  }
+  .one-liner{
+    font-size:clamp(1.15rem,2.55vw,2.35rem); font-weight:400; line-height:1.45;
+    color:#dbe4ef; max-width:34ch; margin:0 auto; text-wrap:balance;
+  }
+  .one-liner em{
+    font-style:normal; font-weight:700;
+    background:linear-gradient(180deg,var(--blue-lt),var(--blue));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .sub{
+    margin-top:2.9rem; font-size:clamp(.85rem,1.35vw,1.16rem); color:var(--dim);
+    letter-spacing:.035em;
+  }
+  .sub b{color:var(--muted); font-weight:600}
+
+  /* --- end card --- */
+  .end h2{
+    font-size:clamp(1.85rem,4.5vw,3.9rem); font-weight:800; letter-spacing:-.03em;
+    line-height:1.12; margin-bottom:2.4rem; text-wrap:balance;
+  }
+  .end h2 em{
+    font-style:normal;
+    background:linear-gradient(180deg,var(--blue-lt),var(--blue));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .stats{display:flex; gap:clamp(1.6rem,5vw,4.6rem); justify-content:center;
+         flex-wrap:wrap; margin:2.6rem 0 3rem}
+  .stat .n{
+    font-size:clamp(2rem,4.6vw,3.9rem); font-weight:800; letter-spacing:-.03em;
+    background:linear-gradient(180deg,var(--blue-lt),var(--blue));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .stat .l{font-size:clamp(.74rem,1.15vw,1rem); color:var(--dim);
+           text-transform:uppercase; letter-spacing:.1em; margin-top:.5rem}
+  .repo{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:clamp(.92rem,1.75vw,1.5rem); color:var(--text);
+    border:1px solid rgba(148,163,184,.24); border-radius:12px;
+    padding:.85rem 1.5rem; display:inline-block; background:rgba(255,255,255,.03);
+  }
+  .hint{
+    position:fixed; bottom:16px; left:0; right:0; text-align:center;
+    font-size:.76rem; color:#334155; letter-spacing:.06em;
+  }
+  body.clean .hint{display:none}
+</style>
+</head>
+<body>
+  <div class="card">
+    <!-- ============ SCREEN 1: TITLE ============ -->
+    <section class="screen active" id="s1">
+      <div class="badges">
+        <span class="badge track">Track 3 · Agent Society</span>
+        <span class="badge">Global AI Hackathon · Qwen Cloud</span>
+      </div>
+
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="7" cy="7" r="2.5" fill="#fff"/>
+          <circle cx="17" cy="7" r="2.5" fill="#fff" opacity=".82"/>
+          <circle cx="7" cy="17" r="2.5" fill="#fff" opacity=".82"/>
+          <circle cx="17" cy="17" r="2.5" fill="#fff" opacity=".62"/>
+          <path d="M7 7h10M7 7v10M17 7v10M7 17h10" stroke="#fff"
+                stroke-width="1.1" opacity=".45"/>
+        </svg>
+      </div>
+
+      <h1>BoardRoom</h1>
+      <div class="rule"></div>
+      <p class="one-liner">
+        A society of AI agents that reviews your PCB<br>
+        <em>— and argues about it.</em>
+      </p>
+      <p class="sub">
+        Five specialists · one Moderator · <b>every finding must cite its evidence</b>
+      </p>
+    </section>
+
+    <!-- ============ SCREEN 2: END CARD ============ -->
+    <section class="screen end" id="s2">
+      <h2>Five cheap specialists doing <em>more</em> work<br>
+          beat one expensive generalist doing less.</h2>
+      <div class="stats">
+        <div class="stat"><div class="n">2.9×</div><div class="l">cheaper</div></div>
+        <div class="stat"><div class="n">2.5×</div><div class="l">more tokens</div></div>
+        <div class="stat"><div class="n">0.00</div><div class="l">hallucination rate</div></div>
+      </div>
+      <div class="repo">github.com/lluisestape-upc/boardroom</div>
+      <p class="sub">
+        Built on Qwen · Alibaba Cloud Model Studio · MIT licensed
+      </p>
+    </section>
+  </div>
+
+  <p class="hint">→ / Space: next screen · C: hide this hint · F11: fullscreen</p>
+
+<script>
+  const screens = [...document.querySelectorAll('.screen')];
+  let i = 0;
+  function show(n){
+    i = (n + screens.length) % screens.length;
+    screens.forEach((s, k) => s.classList.toggle('active', k === i));
+  }
+  addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); show(i + 1); }
+    if (e.key === 'ArrowLeft') show(i - 1);
+    if (e.key.toLowerCase() === 'c') document.body.classList.toggle('clean');
+  });
+  addEventListener('click', () => show(i + 1));
+</script>
+</body>
+</html>
