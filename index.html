@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BoardRoom - PCB Design Review Viewer</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%233b82f6'/%3E%3Ccircle cx='8' cy='8' r='2.2' fill='white'/%3E%3Ccircle cx='16' cy='8' r='2.2' fill='white'/%3E%3Ccircle cx='8' cy='16' r='2.2' fill='white'/%3E%3Ccircle cx='16' cy='16' r='2.2' fill='white'/%3E%3C/svg%3E">
+</head>
+<body class="dark-theme">
+  <!-- Sidebar Navigation -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2" width="20" height="20" rx="4" />
+          <circle cx="8" cy="8" r="2" />
+          <circle cx="16" cy="8" r="2" />
+          <circle cx="8" cy="16" r="2" />
+          <circle cx="16" cy="16" r="2" />
+          <path d="M8 8h8v8H8z" opacity="0.3" fill="currentColor"/>
+        </svg>
+        <span>BoardRoom</span>
+      </div>
+      <span class="badge status-badge green-badge">Track 3</span>
+    </div>
+
+    <div class="project-info-card">
+      <h2 id="projectName">Loading Review...</h2>
+      <div class="project-meta">
+        <div class="meta-row">
+          <span class="meta-label">Session:</span>
+          <span id="sessionId" class="meta-value">-</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Findings:</span>
+          <span id="findingCounts" class="meta-value">-</span>
+        </div>
+      </div>
+    </div>
+
+    <nav class="nav-menu">
+      <button class="nav-btn active" data-view="blast-radius">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          <circle cx="12" cy="12" r="9" opacity="0.1" fill="currentColor" />
+          <path d="M12 3a9 9 0 1 1-9 9 9 9 0 0 1 9-9" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+        <span>Blast-Radius Graph</span>
+      </button>
+
+      <button class="nav-btn" data-view="debate-viewer">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          <path d="M8 10h.01M12 10h.01M16 10h.01" />
+        </svg>
+        <span>Debate Viewer</span>
+        <span id="debateCountBadge" class="nav-badge count-badge hidden">0</span>
+      </button>
+
+      <button class="nav-btn" data-view="board-overlay">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 3h18v18H3zM9 3v18M15 3v18M3 9h18M3 15h18" />
+        </svg>
+        <span>Board Overlay</span>
+      </button>
+
+      <button class="nav-btn" data-view="findings-table">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12h18M3 6h18M3 18h18" />
+        </svg>
+        <span>Findings Table</span>
+      </button>
+
+      <button class="nav-btn" data-view="token-panel">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 20V10M12 20V4M6 20v-6" />
+        </svg>
+        <span>Token Accounting</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div id="dropzone" class="dropzone">
+        <input type="file" id="fileInput" accept=".json" class="file-input">
+        <div class="dropzone-text">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+          </svg>
+          <span>Drop review.json or click to load</span>
+        </div>
+      </div>
+      <div class="system-status">
+        <span class="status-dot green"></span>
+        <span>Static Demo Mode</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content Window -->
+  <main class="content-area">
+    
+    <!-- View 1: Blast-Radius Graph -->
+    <section id="view-blast-radius" class="view-panel active">
+      <div class="panel-header">
+        <div>
+          <h1>Blast-Radius Graph</h1>
+          <p class="subtitle">Visual representation of findings, affected nets, and target components.</p>
+        </div>
+        <div class="filter-controls">
+          <label for="graphFilterSeverity">Severity:</label>
+          <select id="graphFilterSeverity">
+            <option value="all">All Severities</option>
+            <option value="critical">Critical</option>
+            <option value="major">Major</option>
+            <option value="minor">Minor</option>
+            <option value="info">Info</option>
+          </select>
+        </div>
+      </div>
+      <div class="graph-layout">
+        <div class="canvas-container">
+          <canvas id="blastRadiusCanvas"></canvas>
+          <div class="graph-instructions">
+            <span>Scroll to Zoom · Drag to Pan · Drag Nodes to Arrange</span>
+          </div>
+          <div class="graph-legend">
+            <div class="legend-item"><span class="legend-dot finding"></span>Finding</div>
+            <div class="legend-item"><span class="legend-dot net"></span>Net</div>
+            <div class="legend-item"><span class="legend-dot component"></span>Component</div>
+          </div>
+        </div>
+        <div id="graphDetailPanel" class="detail-sidebar card">
+          <div class="detail-placeholder">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4M12 8h.01" />
+            </svg>
+            <p>Hover or click a node in the graph to inspect connections and finding details.</p>
+          </div>
+          <div id="graphDetailContent" class="hidden">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 2: Debate Viewer -->
+    <section id="view-debate-viewer" class="view-panel">
+      <div class="panel-header">
+        <div>
+          <h1>Specialist Agent Debate Viewer</h1>
+          <p class="subtitle">Review contested findings, round-by-round statements, and the Moderator's rulings.</p>
+        </div>
+      </div>
+      <div class="debate-layout">
+        <div class="debate-list-sidebar card">
+          <h3>Contested Findings</h3>
+          <div id="debateList" class="debate-list">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+        <div class="debate-transcript card">
+          <div id="debateTranscriptPlaceholder" class="detail-placeholder">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            <p>Select a contested finding from the sidebar to view the debate history and rulings.</p>
+          </div>
+          <div id="debateTranscriptContent" class="hidden">
+            <div class="debate-topic-header">
+              <div class="topic-title">
+                <span id="debateFindingId" class="finding-id-badge">PI-003</span>
+                <h2 id="debateClaim">Bypass capacitor C1 is placed too far from MCU power pin.</h2>
+              </div>
+              <div class="topic-meta">
+                <span>Severity: <strong id="debateSeverity" class="severity-critical">critical</strong></span>
+                <span>Affected Components: <strong id="debateComponents">-</strong></span>
+              </div>
+            </div>
+            
+            <div id="debateRounds" class="debate-chat-container">
+              <!-- Debate rounds bubble list dynamically generated -->
+            </div>
+
+            <div id="moderatorRulingPanel" class="moderator-ruling-panel">
+              <div class="ruling-header">
+                <div class="moderator-avatar">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  <span>Moderator Adjudication</span>
+                </div>
+                <div id="rulingDecisionBadge" class="ruling-decision-badge status-upheld">UPHELD</div>
+              </div>
+              <div class="ruling-body">
+                <p id="rulingRationale">Rationale text here...</p>
+                <div class="ruling-citations">
+                  <span>Cited Decisive Evidence:</span>
+                  <div id="rulingCitedEvidence" class="citation-links">
+                    <!-- Citation badges here -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 3: Board Overlay -->
+    <section id="view-board-overlay" class="view-panel">
+      <div class="panel-header">
+        <div>
+          <h1>Board Overlay Inspector</h1>
+          <p class="subtitle">Visual bounding boxes mapped directly to the rendered board PNG from DRC and VL Layout critics.</p>
+        </div>
+      </div>
+      <div class="board-layout">
+        <div class="board-viewer-card card">
+          <div class="board-canvas-wrapper">
+            <canvas id="boardOverlayCanvas"></canvas>
+          </div>
+        </div>
+        <div class="board-sidebar card">
+          <h3>Findings on Board</h3>
+          <p class="sidebar-help">Click boxes on the board image or select items below to highlight.</p>
+          <div id="boardFindingList" class="board-finding-list">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 4: Findings Table -->
+    <section id="view-findings-table" class="view-panel">
+      <div class="panel-header">
+        <div>
+          <h1>PCB Findings Checklist</h1>
+          <p class="subtitle">Complete tabular inventory of review findings. Sort, filter, and expand to view evidence and recommendations.</p>
+        </div>
+        <div class="table-filters">
+          <div class="filter-group">
+            <label for="tableFilterAgent">Agent:</label>
+            <select id="tableFilterAgent">
+              <option value="all">All Agents</option>
+              <option value="power_integrity">Power Integrity</option>
+              <option value="signal_integrity">Signal Integrity</option>
+              <option value="connectivity_erc">Connectivity ERC</option>
+              <option value="dfm_layout">DFM & Layout</option>
+              <option value="firmware_bringup">Firmware Bring-up</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="tableFilterStatus">Status:</label>
+            <select id="tableFilterStatus">
+              <option value="all">All Statuses</option>
+              <option value="open">Open</option>
+              <option value="contested">Contested</option>
+              <option value="upheld">Upheld</option>
+              <option value="overruled">Overruled</option>
+              <option value="merged">Merged</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="tableSortBy">Sort By:</label>
+            <select id="tableSortBy">
+              <option value="id">Finding ID</option>
+              <option value="severity">Severity (High → Low)</option>
+              <option value="agent">Agent Name</option>
+              <option value="status">Status</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="table-container card">
+        <table class="findings-table">
+          <thead>
+            <tr>
+              <th width="4%"></th>
+              <th width="10%">ID</th>
+              <th width="15%">Agent</th>
+              <th width="40%">Claim</th>
+              <th width="10%">Severity</th>
+              <th width="10%">Status</th>
+              <th width="11%">Target Scope</th>
+            </tr>
+          </thead>
+          <tbody id="findingsTableBody">
+            <!-- Populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- View 5: Token Panel -->
+    <section id="view-token-panel" class="view-panel">
+      <div class="panel-header">
+        <div>
+          <h1>Agent Society Accounting</h1>
+          <p class="subtitle">Real-time analysis of token efficiency and cost metrics across the specialist society hierarchy.</p>
+        </div>
+      </div>
+      <div class="token-grid">
+        <div class="card stat-card">
+          <h3>Total Tokens Billed</h3>
+          <div class="stat-value" id="totalTokens">-</div>
+          <p class="stat-help">Combined prompt & completion tokens consumed during session.</p>
+        </div>
+        <div class="card stat-card">
+          <h3>Estimated Session Cost</h3>
+          <div class="stat-value" id="totalCost">$-</div>
+          <p class="stat-help">Estimate from placeholder per-token rates &mdash; verify
+            against Model Studio pricing before quoting.</p>
+        </div>
+        <div class="card stat-card">
+          <h3>Society Savings Rate</h3>
+          <div class="stat-value text-green" id="savingsRate">65.7%</div>
+          <p class="stat-help">Measured in the 6-board benchmark ($0.147 vs $0.429 for a
+            single qwen3-max agent) &mdash; not computed from this session.</p>
+        </div>
+      </div>
+      <div class="token-charts-layout">
+        <div class="card chart-card">
+          <h3>Token Accounting per Specialist Agent</h3>
+          <div class="bar-chart-container">
+            <div id="tokenBarChart" class="stacked-bar-chart">
+              <!-- Built dynamically with HTML/CSS -->
+            </div>
+            <div class="chart-legend-horizontal">
+              <div class="legend-item"><span class="legend-dot prompt-token"></span>Prompt Tokens</div>
+              <div class="legend-item"><span class="legend-dot completion-token"></span>Completion Tokens</div>
+            </div>
+          </div>
+        </div>
+        <div class="card coverage-card">
+          <h3>Agent Scope Coverage Notes</h3>
+          <div id="coverageNotesList" class="coverage-notes-list">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Load script to inject default review.sample.json -->
+  <script src="sample_data.js"></script>
+  <!-- Load dashboard script -->
+  <script src="app.js"></script>
+</body>
+</html>
